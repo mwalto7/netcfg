@@ -1,0 +1,31 @@
+# Example multi-vendor, per-host configuration file.
+
+# tmpl.yml
+---
+hosts: hosts
+user: user
+pass: {{password}}
+timeout: 5
+
+config:
+  {{range .template.cisco -}}
+  - vendor: cisco
+    host: {{.host}}
+    cmds:
+      - conf t
+      - snmp-server location {{.location}}
+      - exit
+      - write mem
+      - exit
+  {{end -}}
+
+  {{range .template.hp -}}
+  - vendor: hp
+    host: {{.host}}
+    cmds:
+      - sys
+      - snmp-agent sys-info location {{.location}}
+      - quit
+      - save force
+      - quit
+  {{end -}}

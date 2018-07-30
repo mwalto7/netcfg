@@ -1,0 +1,16 @@
+# Example template data for tmpl_multi_hosts.yml.
+#
+# Run `netconfig run tmpl_multi_hosts.yml -t tmpl_multi_data.yml --dry-run`
+# to test the output.
+---
+template:
+  hp:
+    - host    : 127.0.0.1
+      location: snmp_location_127.0.0.1
+    - host    : 127.0.0.4
+      location: snmp_location_127.0.0.4
+  cisco:
+    - host    : 127.0.0.2
+      location: snmp_location_127.0.0.2
+    - host    : 127.0.0.3
+      location: snmp_location_127.0.0.3
