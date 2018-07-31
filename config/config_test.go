@@ -1,9 +1,9 @@
 package config
 
 import (
+	"fmt"
 	"testing"
 	"time"
-	"fmt"
 )
 
 func TestNew(t *testing.T) {
