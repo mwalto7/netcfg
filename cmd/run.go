@@ -78,6 +78,7 @@ func runCmdRunE(_ *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+
 	if dryRun {
 		return dryRunCfg(cfg)
 	}
@@ -99,6 +100,7 @@ func dryRunCfg(cfg *config.Config) error {
 		}
 		fmt.Println()
 	}
+	fmt.Println(cfg.String())
 	return nil
 }
 
