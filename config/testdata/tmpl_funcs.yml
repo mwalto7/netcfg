@@ -1,0 +1,5 @@
+---
+pass: {{password "testing123"}}
+config:
+  - cmds:
+      - {{prompt "N"}}

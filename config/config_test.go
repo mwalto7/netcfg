@@ -11,6 +11,7 @@ const (
 	hasError = false
 )
 
+// TODO: Use data from testdata folder.
 const (
 	options = `
 ---
@@ -68,7 +69,6 @@ config:
     cmds:
       - snmp-agent location host2_snmp_location
 `
-	// TODO: fix password template func to read from stdin for tests
 	tmplFuncs = `
 ---
 pass: {{password "testing123"}}
@@ -94,7 +94,13 @@ type configTest struct {
 }
 
 var configParseTests = []configTest{
-	{"empty", "", "", hasError, nil},
+	{
+		name: "empty",
+		data: "",
+		src:  "",
+		ok:   hasError,
+		want: nil,
+	},
 	{
 		name: "options",
 		data: "",

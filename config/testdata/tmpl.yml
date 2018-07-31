@@ -1,0 +1,7 @@
+---
+config:
+  {{- range .template}}
+  - hostname: {{.hostname}}
+    cmds:
+      - snmp-agent location {{.location}}
+  {{- end}}

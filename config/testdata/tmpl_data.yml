@@ -1,0 +1,6 @@
+---
+template:
+  - hostname: host1
+    location: host1_snmp_location
+  - hostname: host2
+    location: host2_snmp_location
