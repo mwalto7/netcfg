@@ -1,55 +1,10 @@
 package config
 
 import (
-	"fmt"
 	"testing"
 	"time"
+	"fmt"
 )
-
-func TestNew(t *testing.T) {
-	name := "test"
-	got := New(name)
-	want := &Config{name: name}
-	if !configsEqual(got, want) {
-		t.Errorf("want %v, got %v", want, got)
-	}
-}
-
-func TestConfig_Template(t *testing.T) {
-	const tmplSrc = `
----
-template:
-  cisco:
-    - host: cisco_host
-      location: cisco_snmp_location
-  hp:
-    - host: hp_host
-      location: hp_snmp_location_2
-`
-	got := New("tmpl").Template(tmplSrc)
-	want := &Config{name: "tmpl", data: tmplSrc}
-	if !configsEqual(got, want) {
-		t.Errorf("want %v, got %v", want, got)
-	}
-}
-
-func TestConfig_Name(t *testing.T) {
-	want := "test"
-	got := New(want)
-	if got.Name() != want {
-		t.Errorf("want %s, got %s", want, got.Name())
-	}
-}
-
-func TestConfig_String(t *testing.T) {
-	got, err := New("test").Parse(options)
-	if err != nil {
-		t.Error(err)
-	}
-	if got.String() != got.contents || got.String() != options {
-		t.Errorf("want %s, got %s", options, got.String())
-	}
-}
 
 const (
 	noError  = true
@@ -192,6 +147,51 @@ var configParseTests = []configTest{
 	},
 }
 
+func TestNew(t *testing.T) {
+	name := "test"
+	got := New(name)
+	want := &Config{name: name}
+	if !configsEqual(got, want) {
+		t.Errorf("want %v, got %v", want, got)
+	}
+}
+
+func TestConfig_Template(t *testing.T) {
+	const tmplSrc = `
+---
+template:
+  cisco:
+    - host: cisco_host
+      location: cisco_snmp_location
+  hp:
+    - host: hp_host
+      location: hp_snmp_location_2
+`
+	got := New("tmpl").Template(tmplSrc)
+	want := &Config{name: "tmpl", data: tmplSrc}
+	if !configsEqual(got, want) {
+		t.Errorf("want %v, got %v", want, got)
+	}
+}
+
+func TestConfig_Name(t *testing.T) {
+	want := "test"
+	got := New(want)
+	if got.Name() != want {
+		t.Errorf("want %s, got %s", want, got.Name())
+	}
+}
+
+func TestConfig_String(t *testing.T) {
+	got, err := New("test").Parse(options)
+	if err != nil {
+		t.Error(err)
+	}
+	if got.String() != got.contents || got.String() != options {
+		t.Errorf("want %s, got %s", options, got.String())
+	}
+}
+
 func TestConfig_Parse(t *testing.T) {
 	for _, test := range configParseTests {
 		if test.want != nil {
@@ -220,6 +220,32 @@ func TestConfig_Parse(t *testing.T) {
 				t.Errorf("\nwant: %v\ngot: %v", test.want, got)
 			}
 		})
+	}
+}
+
+func TestMapCmds(t *testing.T) {
+	cfg, err := New("cfg").Parse(aliases)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmds, err := MapCmds(cfg)
+	if err != nil {
+		t.Error(err)
+	}
+	s := "IP Addr: %s, Hostname: %q, Vendor: %q, OS: %q, Model: %q, Version: %q"
+	ciscoDefaultCmds, ok := cmds[fmt.Sprintf(s, "", "", "cisco", "", "", "")]
+	if !ok {
+		t.Errorf("key not in cmdMap")
+	}
+	if !slicesEqual(ciscoDefaultCmds, []string{"show lldp neighbors", "quit"}) {
+		t.Errorf("commands do not match")
+	}
+	ciscoModifiedCmds, ok := cmds[fmt.Sprintf(s, "", "", "cisco", "", "c2960s", "")]
+	if !ok {
+		t.Errorf("key not in cmdMap")
+	}
+	if !slicesEqual(ciscoModifiedCmds, []string{"show lldp neighbors", "write mem", "quit"}) {
+		t.Errorf("commands do not match")
 	}
 }
 
@@ -289,30 +315,4 @@ func toStringSlice(x interface{}) (s []string) {
 		}
 	}
 	return s
-}
-
-func TestMapCmds(t *testing.T) {
-	cfg, err := New("cfg").Parse(aliases)
-	if err != nil {
-		t.Fatal(err)
-	}
-	cmds, err := MapCmds(cfg)
-	if err != nil {
-		t.Error(err)
-	}
-	s := "IP Addr: %s, Hostname: %q, Vendor: %q, OS: %q, Model: %q, Version: %q"
-	ciscoDefaultCmds, ok := cmds[fmt.Sprintf(s, "", "", "cisco", "", "", "")]
-	if !ok {
-		t.Errorf("key not in cmdMap")
-	}
-	if !slicesEqual(ciscoDefaultCmds, []string{"show lldp neighbors", "quit"}) {
-		t.Errorf("commands do not match")
-	}
-	ciscoModifiedCmds, ok := cmds[fmt.Sprintf(s, "", "", "cisco", "", "c2960s", "")]
-	if !ok {
-		t.Errorf("key not in cmdMap")
-	}
-	if !slicesEqual(ciscoModifiedCmds, []string{"show lldp neighbors", "write mem", "quit"}) {
-		t.Errorf("commands do not match")
-	}
 }
