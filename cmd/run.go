@@ -31,8 +31,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/mwalto7/netcfg/config"
-	"github.com/mwalto7/netcfg/device"
+	"github.com/mwalto7/netcfg-refactor-testable/config"
+	"github.com/mwalto7/netcfg-refactor-testable/device"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh"
 )
@@ -78,7 +78,6 @@ func runCmdRunE(_ *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-
 	if dryRun {
 		return dryRunCfg(cfg)
 	}

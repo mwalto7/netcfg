@@ -1,16 +1,17 @@
 package config
 
 import (
+	"bytes"
 	"errors"
-	"github.com/spf13/viper"
-	"text/template"
 	"fmt"
 	"io"
-	"bytes"
 	"io/ioutil"
-	"time"
-	"strings"
 	"os"
+	"strings"
+	"text/template"
+	"time"
+
+	"github.com/spf13/viper"
 	"golang.org/x/crypto/ssh/terminal"
 )
 
@@ -142,50 +143,52 @@ func (c *Config) String() string {
 	return c.contents
 }
 
-//// MapCmds prints a map from options to commands.
-//func MapCmds(cfg *Config) (map[string][]string, error) {
-//	mapCmd := func(set *cmdSet, v interface{}, cmds map[string][]string) error {
-//		var keys []string
-//		s := "IP Addr: %s, Hostname: %q, Vendor: %q, OS: %q, Model: %q, Version: %q"
-//		if len(set.Models) > 0 {
-//			for _, model := range set.Models {
-//				keys = append(keys, fmt.Sprintf(s, set.Addr, set.Hostname, set.Vendor, set.OS, model, set.Version))
-//			}
-//		} else {
-//			keys = append(keys, fmt.Sprintf(s, set.Addr, set.Hostname, set.Vendor, set.OS, "", set.Version))
-//		}
-//		cmd, ok := v.(string)
-//		if !ok {
-//			return fmt.Errorf("expected string, got %T", v)
-//		}
-//		for _, k := range keys {
-//			if k == "" || k == fmt.Sprintf(s, "", "", "", "", "", "") {
-//				k = "generic"
-//			} else {
-//				k = strings.TrimSpace(k)
-//			}
-//			cmds[k] = append(cmds[k], cmd)
-//		}
-//		return nil
-//	}
-//	cmds := make(map[string][]string, len(cfg.Config))
-//	for _, set := range cfg.Config {
-//		switch v := set.Cmds.(type) {
-//		case []interface{}:
-//			for i := 0; i < len(v); i++ {
-//				if err := mapCmd(set, v[i], cmds); err != nil {
-//					return nil, err
-//				}
-//			}
-//		case map[interface{}]interface{}:
-//			for i := 0; i < len(v); i++ {
-//				if err := mapCmd(set, v[i], cmds); err != nil {
-//					return nil, err
-//				}
-//			}
-//		default:
-//			return nil, fmt.Errorf("expected sequence or map, got %T", v)
-//		}
-//	}
-//	return cmds, nil
-//}
+// MapCmds prints a map from options to commands.
+func MapCmds(cfg *Config) (map[string][]string, error) {
+	cmds := make(map[string][]string, len(cfg.Config))
+	for _, set := range cfg.Config {
+		switch v := set.Cmds.(type) {
+		case []interface{}:
+			for i := 0; i < len(v); i++ {
+				if err := mapCmd(set, v[i], cmds); err != nil {
+					return nil, err
+				}
+			}
+		case map[interface{}]interface{}:
+			for i := 0; i < len(v); i++ {
+				if err := mapCmd(set, v[i], cmds); err != nil {
+					return nil, err
+				}
+			}
+		default:
+			return nil, fmt.Errorf("expected sequence or map, got %T", v)
+		}
+	}
+	return cmds, nil
+}
+
+// mapCmd maps a command to its options.
+func mapCmd(set cmdSet, v interface{}, cmds map[string][]string) error {
+	var keys []string
+	s := "IP Addr: %s, Hostname: %q, Vendor: %q, OS: %q, Model: %q, Version: %q"
+	if len(set.Models) > 0 {
+		for _, model := range set.Models {
+			keys = append(keys, fmt.Sprintf(s, set.Addr, set.Hostname, set.Vendor, set.OS, model, set.Version))
+		}
+	} else {
+		keys = append(keys, fmt.Sprintf(s, set.Addr, set.Hostname, set.Vendor, set.OS, "", set.Version))
+	}
+	cmd, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("expected string, got %T", v)
+	}
+	for _, k := range keys {
+		if k == "" || k == fmt.Sprintf(s, "", "", "", "", "", "") {
+			k = "generic"
+		} else {
+			k = strings.TrimSpace(k)
+		}
+		cmds[k] = append(cmds[k], cmd)
+	}
+	return nil
+}

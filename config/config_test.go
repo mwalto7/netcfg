@@ -3,6 +3,7 @@ package config
 import (
 	"testing"
 	"time"
+	"fmt"
 )
 
 func TestNew(t *testing.T) {
@@ -288,4 +289,30 @@ func toStringSlice(x interface{}) (s []string) {
 		}
 	}
 	return s
+}
+
+func TestMapCmds(t *testing.T) {
+	cfg, err := New("cfg").Parse(aliases)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmds, err := MapCmds(cfg)
+	if err != nil {
+		t.Error(err)
+	}
+	s := "IP Addr: %s, Hostname: %q, Vendor: %q, OS: %q, Model: %q, Version: %q"
+	ciscoDefaultCmds, ok := cmds[fmt.Sprintf(s, "", "", "cisco", "", "", "")]
+	if !ok {
+		t.Errorf("key not in cmdMap")
+	}
+	if !slicesEqual(ciscoDefaultCmds, []string{"show lldp neighbors", "quit"}) {
+		t.Errorf("commands do not match")
+	}
+	ciscoModifiedCmds, ok := cmds[fmt.Sprintf(s, "", "", "cisco", "", "c2960s", "")]
+	if !ok {
+		t.Errorf("key not in cmdMap")
+	}
+	if !slicesEqual(ciscoModifiedCmds, []string{"show lldp neighbors", "write mem", "quit"}) {
+		t.Errorf("commands do not match")
+	}
 }
