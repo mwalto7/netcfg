@@ -187,7 +187,7 @@ func initCfg(src string, data map[string]interface{}) error {
 	}
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintf(os.Stderr, "Successfully created: %s\n", f.Name())
-	fmt.Fprintf(os.Stderr, "Test it with 'netcfg run %s --dry-run'\n", f.Name())
+	fmt.Fprintf(os.Stderr, "Test it with 'netcfg run %s --dry-run'.\n", f.Name())
 	return nil
 }
 

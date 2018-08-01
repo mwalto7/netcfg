@@ -2,6 +2,7 @@ package config
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -10,33 +11,31 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"golang.org/x/crypto/ssh/terminal"
 )
 
-// cmdSet represents a set of commands for the `aliases` and `config` keys
-// inside of a `netcfg` configuration file.
+// cmdSet is the set of configurations commands to be run.
 type cmdSet struct {
-	Addr     string      `yaml:"addr"`     // IP address these commands apply to
-	Hostname string      `yaml:"hostname"` // hostname these commands apply to
-	Vendor   string      `yaml:"vendor"`   // vendor these commands apply to
-	OS       string      `yaml:"os"`       // operating system these commands apply to
-	Models   []string    `yaml:"models"`   // models these commands apply to
-	Version  string      `yaml:"version"`  // software version these commands apply to
+	Addr     string      `yaml:"addr"`     // commands apply to this IP address
+	Hostname string      `yaml:"hostname"` // commands apply to this hostname
+	Vendor   string      `yaml:"vendor"`   // commands apply to this vendor
+	OS       string      `yaml:"os"`       // commands apply to this operating system
+	Models   []string    `yaml:"models"`   // commands apply to these models
+	Version  string      `yaml:"version"`  // commands apply to this software version
 	Cmds     interface{} `yaml:"cmds"`     // configuration commands to run
 }
 
 // Config represents a `netcfg` configuration file.
 type Config struct {
-	Hosts   string        `yaml:"hosts"`   // hosts to configure
-	User    string        `yaml:"user"`    // user for host login
-	Pass    string        `yaml:"pass"`    // password authentication
+	Hosts   string        `yaml:"hosts"`   // file of hosts to configure
+	User    string        `yaml:"user"`    // username for host login
+	Pass    string        `yaml:"pass"`    // password for host login
 	Keys    []string      `yaml:"keys"`    // ssh private keys for authentication
-	Accept  string        `yaml:"accept"`  // accept connections to these hosts only
-	Timeout time.Duration `yaml:"timeout"` // time to wait to establish a connection
-	Aliases []*cmdSet     `yaml:"aliases"` // general command set definitions
-	Config  []*cmdSet     `yaml:"config"`  // sets of configuration commands
+	Accept  string        `yaml:"accept"`  // group of hosts to accept connections to
+	Timeout time.Duration `yaml:"timeout"` // time to wait to establish an ssh client connection
+	Aliases []cmdSet      `yaml:"aliases"` // aliases for configuration command sets
+	Config  []cmdSet      `yaml:"config"`  // sets of configuration commands to run
 
 	name     string // name of this config
 	data     string // template data for this config
@@ -56,27 +55,21 @@ func (c *Config) Template(src string) *Config {
 
 // Parse parses a Config with any template data.
 func (c *Config) Parse(src string) (*Config, error) {
+	if src == "" {
+		return nil, errors.New("nothing to parse, config file is empty")
+	}
+	tmpl, err := template.New("cfg").Funcs(template.FuncMap{"password": getPass, "prompt": prompt}).Parse(src)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse template %s: %v", tmpl.Name(), err)
+	}
+
 	v := viper.New()
 	v.SetConfigType("yaml")
 
-	// create a template from `src`
-	tmpl, err := template.New("cfg").Funcs(template.FuncMap{"password": getPass, "prompt": prompt}).Parse(src)
+	data, err := unmarshal(v, c.data)
 	if err != nil {
 		return nil, err
 	}
-
-	// read in any template data
-	var data interface{}
-	if c.data != "" {
-		if err := v.ReadConfig(strings.NewReader(c.data)); err != nil {
-			return nil, err
-		}
-		if err := v.Unmarshal(&data); err != nil {
-			return nil, err
-		}
-	}
-
-	// execute the template with the data
 	pr, pw := io.Pipe()
 	go func(pw *io.PipeWriter, data interface{}) {
 		defer pw.Close()
@@ -86,29 +79,42 @@ func (c *Config) Parse(src string) (*Config, error) {
 		}
 	}(pw, data)
 
-	// read in results of executing the template
 	var buf bytes.Buffer
 	if err := v.ReadConfig(io.TeeReader(pr, &buf)); err != nil {
 		return nil, err
 	}
-
-	// copy the results for use in printing
 	b, err := ioutil.ReadAll(&buf)
 	if err != nil {
 		return nil, err
 	}
 	c.contents = string(b)
 
-	// unmarshal data into Config
 	if err := v.Unmarshal(c); err != nil {
 		return nil, err
 	}
 	return c, nil
 }
 
+// unmarshal reads in a src string and decodes the data.
+func unmarshal(v *viper.Viper, src string) (data interface{}, err error) {
+	if src == "" {
+		return
+	}
+	if err = v.ReadConfig(strings.NewReader(src)); err != nil {
+		return
+	}
+	if err = v.Unmarshal(&data); err != nil {
+		return
+	}
+	return
+}
+
 // getPass is a function used in text templates for prompting for a password.
-func getPass() (string, error) {
-	fmt.Fprint(os.Stderr, "Password: ")
+func getPass(s ...string) (string, error) {
+	if len(s) > 0 {
+		return s[0], nil
+	}
+	fmt.Fprintf(os.Stderr, "Password: ")
 	password, err := terminal.ReadPassword(int(os.Stdin.Fd()))
 	if err != nil {
 		return "", err
@@ -122,39 +128,23 @@ func getPass() (string, error) {
 func prompt(v interface{}) (string, error) {
 	val, ok := v.(string)
 	if !ok {
-		return "", errors.Errorf("expected string, got %T", v)
+		return "", fmt.Errorf("expected string, got %T", v)
 	}
 	return fmt.Sprintf("%q", val), nil
 }
 
+// Name returns the name of this Config.
+func (c *Config) Name() string {
+	return c.name
+}
+
+// String returns the string representation of this Config.
+func (c *Config) String() string {
+	return c.contents
+}
+
 // MapCmds prints a map from options to commands.
-//
-// TODO: setup keys for easy comparison to (*Client).String()
 func MapCmds(cfg *Config) (map[string][]string, error) {
-	mapCmd := func(set *cmdSet, v interface{}, cmds map[string][]string) error {
-		var keys []string
-		s := "IP Addr: %s, Hostname: %q, Vendor: %q, OS: %q, Model: %q, Version: %q"
-		if len(set.Models) > 0 {
-			for _, model := range set.Models {
-				keys = append(keys, fmt.Sprintf(s, set.Addr, set.Hostname, set.Vendor, set.OS, model, set.Version))
-			}
-		} else {
-			keys = append(keys, fmt.Sprintf(s, set.Addr, set.Hostname, set.Vendor, set.OS, "", set.Version))
-		}
-		cmd, ok := v.(string)
-		if !ok {
-			return fmt.Errorf("expected string, got %T", v)
-		}
-		for _, k := range keys {
-			if k == "" || k == fmt.Sprintf(s, "", "", "", "", "", "") {
-				k = "generic"
-			} else {
-				k = strings.TrimSpace(k)
-			}
-			cmds[k] = append(cmds[k], cmd)
-		}
-		return nil
-	}
 	cmds := make(map[string][]string, len(cfg.Config))
 	for _, set := range cfg.Config {
 		switch v := set.Cmds.(type) {
@@ -177,12 +167,28 @@ func MapCmds(cfg *Config) (map[string][]string, error) {
 	return cmds, nil
 }
 
-// Name returns the name of this Config.
-func (c *Config) Name() string {
-	return c.name
-}
-
-// String returns the string representation of this Config.
-func (c *Config) String() string {
-	return c.contents
+// mapCmd maps a command to its options.
+func mapCmd(set cmdSet, v interface{}, cmds map[string][]string) error {
+	var keys []string
+	s := "IP Addr: %s, Hostname: %q, Vendor: %q, OS: %q, Model: %q, Version: %q"
+	if len(set.Models) > 0 {
+		for _, model := range set.Models {
+			keys = append(keys, fmt.Sprintf(s, set.Addr, set.Hostname, set.Vendor, set.OS, model, set.Version))
+		}
+	} else {
+		keys = append(keys, fmt.Sprintf(s, set.Addr, set.Hostname, set.Vendor, set.OS, "", set.Version))
+	}
+	cmd, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("expected string, got %T", v)
+	}
+	for _, k := range keys {
+		if k == "" || k == fmt.Sprintf(s, "", "", "", "", "", "") {
+			k = "generic"
+		} else {
+			k = strings.TrimSpace(k)
+		}
+		cmds[k] = append(cmds[k], cmd)
+	}
+	return nil
 }

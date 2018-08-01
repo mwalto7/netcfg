@@ -1,0 +1,17 @@
+---
+aliases:
+  - &cisco_default
+    vendor: cisco
+    cmds: &cisco_cmds
+      0: show lldp neighbors
+      1: quit
+
+config:
+  - *cisco_default
+  - <<: *cisco_default
+    models:
+      - c2960s
+    cmds:
+      <<: *cisco_cmds
+      1: write mem
+      2: quit

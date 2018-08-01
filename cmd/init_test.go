@@ -2,51 +2,42 @@ package cmd
 
 import (
 	"bufio"
-	"io"
 	"io/ioutil"
-	"os"
+	"strings"
 	"testing"
 )
 
-const (
-	noError  = true
-	hasError = false
-)
+func TestRunInitCmd(t *testing.T) {
+
+}
+
+func TestInitCfg(t *testing.T) {
+
+}
+
+func TestInitIT(t *testing.T) {
+
+}
 
 func TestGetValue(t *testing.T) {
 	tests := []struct {
-		name   string
-		file   string
-		prompt string
-		v      interface{}
-		want   string
-		ok     bool
+		name       string
+		input      string
+		defaultVal interface{}
 	}{
-		{"empty", "empty", "", nil, "", noError},
+		{"empty", "", nil},
+		{"default", "", "default"},
+		{"new value", "new value", "default"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			f, err := ioutil.TempFile("", test.file)
+			r := bufio.NewReader(strings.NewReader(test.input + string('\n')))
+			got, err := getVal(r, ioutil.Discard, "Enter test value:", test.defaultVal)
 			if err != nil {
-				t.Fatal(err)
-			}
-			defer f.Close()
-
-			got, err := getVal(bufio.NewReader(f), ioutil.Discard, test.prompt, test.v)
-			switch {
-			case (err == nil || err == io.EOF) && !test.ok:
-				t.Errorf("expected error, got none")
-			case err != nil && err != io.EOF && test.ok:
 				t.Errorf("unexpected error: %v", err)
-			case err != nil && err != io.EOF && !test.ok:
-				t.Logf("got expected error: %v", err)
-				return
 			}
-			if got != test.want {
-				t.Fatalf("expected %s, got %s", test.want, got)
-			}
-			if err := os.Remove(f.Name()); err != nil {
-				t.Fatal(err)
+			if got != test.input {
+				t.Errorf("want %q, got %q", test.input, got)
 			}
 		})
 	}

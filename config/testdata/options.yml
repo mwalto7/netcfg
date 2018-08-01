@@ -1,0 +1,8 @@
+---
+hosts: hosts.txt
+user: user
+pass: password
+keys:
+  - /home/user/.ssh/id_rsa
+accept: all
+timeout: 10s

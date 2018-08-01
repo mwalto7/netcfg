@@ -99,6 +99,7 @@ func dryRunCfg(cfg *config.Config) error {
 		}
 		fmt.Println()
 	}
+	fmt.Println(cfg.String())
 	return nil
 }
 
