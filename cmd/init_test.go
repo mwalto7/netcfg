@@ -1,10 +1,10 @@
 package cmd
 
 import (
-	"testing"
 	"bufio"
-	"strings"
 	"io/ioutil"
+	"strings"
+	"testing"
 )
 
 func TestRunInitCmd(t *testing.T) {

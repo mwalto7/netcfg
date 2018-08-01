@@ -31,8 +31,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/mwalto7/netcfg-refactor-testable/config"
-	"github.com/mwalto7/netcfg-refactor-testable/device"
+	"github.com/mwalto7/netcfg/config"
+	"github.com/mwalto7/netcfg/device"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh"
 )

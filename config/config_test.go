@@ -1,9 +1,9 @@
 package config
 
 import (
+	"fmt"
 	"testing"
 	"time"
-	"fmt"
 )
 
 const (
