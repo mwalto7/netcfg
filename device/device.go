@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	snmp "github.com/mwalto7/gosnmp"
+	snmp "github.com/mwalto7/go-snmp"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"golang.org/x/crypto/ssh"
@@ -20,13 +20,13 @@ var Timeout = time.Duration(0)
 
 // Client represents an SSH client for a network device.
 type Client struct {
-	*ssh.Client        // underlying SSH client connection
-	addr        string // IP address of the device
-	hostname    string // hostname of the device
-	vendor      string // vendor of the device
-	os          string // operating system of the device
-	model       string // model of the device
-	version     string // software version of the device
+	*ssh.Client     // underlying SSH client connection
+	addr     string // IP address of the device
+	hostname string // hostname of the device
+	vendor   string // vendor of the device
+	os       string // operating system of the device
+	model    string // model of the device
+	version  string // software version of the device
 }
 
 // Dial establishes an SSH client connection to a remote host.
@@ -178,21 +178,19 @@ func sysDescr(addr string) map[string]string {
 
 // getSysDescr gets the sysDescr of a host through SNMP.
 func getSysDescr(addr string, info chan<- map[string]string) {
-	s, err := snmp.NewGoSNMP(addr, viper.GetString("snmp.community"), snmp.Version2c, 5)
+	client, err := snmp.NewClient(addr, viper.GetString("snmp.community"), snmp.Version2c, 5)
 	if err != nil {
 		return
 	}
-	resp, err := s.Get(".1.3.6.1.2.1.1.1.0")
+	res, err := client.Get(".1.3.6.1.2.1.1.1.0")
 	if err != nil {
 		return
 	}
 	var descr string
-loop:
-	for _, v := range resp.Variables {
-		switch v.Type {
-		case snmp.OctetString:
+	for _, v := range res.Variables {
+		if v.Type == snmp.OctetString {
 			descr = v.Value.(string)
-			break loop
+			break
 		}
 	}
 	info <- parseSysDescr(descr)
