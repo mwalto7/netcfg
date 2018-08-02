@@ -20,13 +20,13 @@ var Timeout = time.Duration(0)
 
 // Client represents an SSH client for a network device.
 type Client struct {
-	*ssh.Client     // underlying SSH client connection
-	addr     string // IP address of the device
-	hostname string // hostname of the device
-	vendor   string // vendor of the device
-	os       string // operating system of the device
-	model    string // model of the device
-	version  string // software version of the device
+	*ssh.Client        // underlying SSH client connection
+	addr        string // IP address of the device
+	hostname    string // hostname of the device
+	vendor      string // vendor of the device
+	os          string // operating system of the device
+	model       string // model of the device
+	version     string // software version of the device
 }
 
 // Dial establishes an SSH client connection to a remote host.
