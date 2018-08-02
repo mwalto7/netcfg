@@ -2,6 +2,9 @@
 
 Fast network device configuration.
 
+[![GoDoc](https://godoc.org/github.com/mwalto7/netcfg?status.svg)](https://godoc.org/github.com/mwalto7/netcfg)
+[![Go Report Card](https://goreportcard.com/badge/github.com/mwalto7/netcfg)](https://goreportcard.com/report/github.com/mwalto7/netcfg)
+
 ## Overview
 
 netcfg is a command line tool for fast, configurable network device 
