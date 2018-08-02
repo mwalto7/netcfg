@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	snmp "github.com/mwalto7/go-snmp"
+	snmp "github.com/mwalto7/gosnmp"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"golang.org/x/crypto/ssh"
@@ -182,6 +182,8 @@ func getSysDescr(addr string, info chan<- map[string]string) {
 	if err != nil {
 		return
 	}
+	defer client.Close()
+
 	res, err := client.Get(".1.3.6.1.2.1.1.1.0")
 	if err != nil {
 		return
