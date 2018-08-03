@@ -145,7 +145,7 @@ func runInitCmd(_ *cobra.Command, args []string) error {
 		"timeout":     timeout,
 	}
 	if interactive {
-		if err := it(data); err != nil {
+		if err := it(data, os.Stdin); err != nil {
 			return err
 		}
 	}
@@ -190,8 +190,8 @@ func initCfg(src string, data map[string]interface{}) error {
 }
 
 // it enables interactive mode for setting options for a new configuration file.
-func it(data map[string]interface{}) error {
-	r := bufio.NewReader(os.Stdin)
+func it(data map[string]interface{}, file *os.File) error {
+	r := bufio.NewReader(file)
 
 	d, err := getVal("Enter a description", data["description"], r, os.Stderr)
 	if err != nil {
