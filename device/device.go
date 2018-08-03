@@ -20,13 +20,13 @@ var Timeout = time.Duration(0)
 
 // Client represents an SSH client for a network device.
 type Client struct {
-	*ssh.Client        // underlying SSH client connection
-	addr        string // IP address of the device
-	hostname    string // hostname of the device
-	vendor      string // vendor of the device
-	os          string // operating system of the device
-	model       string // model of the device
-	version     string // software version of the device
+	*ssh.Client     // underlying SSH client connection
+	addr     string // IP address of the device
+	hostname string // hostname of the device
+	vendor   string // vendor of the device
+	os       string // operating system of the device
+	model    string // model of the device
+	version  string // software version of the device
 }
 
 // Dial establishes an SSH client connection to a remote host.
@@ -161,7 +161,7 @@ func (c *Client) Close() error {
 
 // sysDescr gets the sysDescr from an ssh client.
 func sysDescr(addr string) map[string]string {
-	info := make(chan map[string]string, 1)
+	info := make(chan map[string]string)
 	go getSysDescr(addr, info)
 
 	// lookup hostname
@@ -178,14 +178,18 @@ func sysDescr(addr string) map[string]string {
 
 // getSysDescr gets the sysDescr of a host through SNMP.
 func getSysDescr(addr string, info chan<- map[string]string) {
+	defer close(info)
+
 	client, err := snmp.NewClient(addr, viper.GetString("snmp.community"), snmp.Version2c, 5)
 	if err != nil {
+		info <- map[string]string{"addr": "", "hostname": "", "vendor": "", "os": "", "model": "", "version": ""}
 		return
 	}
 	defer client.Close()
 
 	res, err := client.Get(".1.3.6.1.2.1.1.1.0")
 	if err != nil {
+		info <- map[string]string{"addr": "", "hostname": "", "vendor": "", "os": "", "model": "", "version": ""}
 		return
 	}
 	var descr string
@@ -196,7 +200,6 @@ func getSysDescr(addr string, info chan<- map[string]string) {
 		}
 	}
 	info <- parseSysDescr(descr)
-	close(info)
 }
 
 // parseSysDescr parses the sysDescr.0 OID string to gather device information.
@@ -212,25 +215,23 @@ func parseSysDescr(sysDescr string) map[string]string {
 	switch {
 	case strings.Contains(sysDescr, "Cisco"):
 		m["vendor"] = "CISCO"
-		reModel := `([Cc]|[CATcat]|[Nn]|[Mm]|cgr)\d{4}[A-Za-z]?`
-		m["model"] = regexp.MustCompile(reModel).FindString(sysDescr)
-		software := regexp.MustCompile(reModel + `(\d*_rp)?-(\w*[Kk]9|Y|I)(-[Mm][Zz]?)?`).FindString(sysDescr)
-		version := regexp.MustCompile(`Version\s(\d{1,2}\.?)*([[(].*[])])?`).FindString(sysDescr)
+		m["model"] = regexp.MustCompile(`([Cc]|[Cc][Aa][Tt]|[Nn]|[Mm]|[Cc][Gg][Rr])(\d{4}\w?|\d\w_\w*)|(\w?\d*_rp)|ASR\dK`).FindString(sysDescr)
+		software := regexp.MustCompile(`([CATcat]*|[Nn]|[Mm]|[CGRcgr]*|\w?\d*_rp)(\d\w_\w*|\d{4}\w?)?(-(\w*[Kk]9|Y|I)([-_]([WANwan-]*)?[Mm][Zz]?)?)`).FindString(sysDescr)
+		version := regexp.MustCompile(`(Version (\(?(\d{1,2}|\w{1,2})\)?\.?)*)([[(].*[])])?(,?\s?)(RELEASE SOFTWARE (\(.*\)))?`).FindString(sysDescr)
 		v := strings.Replace(version, ",", "", 5)
 		m["version"] = strings.TrimSpace(fmt.Sprintf("%s %s", software, v))
 		switch {
 		case strings.Contains(sysDescr, "IOS"):
-			if strings.Contains(sysDescr, "IOS XR") {
+			switch {
+			case strings.Contains(sysDescr, "IOS XR"), strings.Contains(sysDescr, "IOS-XR"):
 				m["os"] = "IOS XR"
-			} else if strings.Contains(sysDescr, "IOS XE") {
+			case strings.Contains(sysDescr, "IOS XE"), strings.Contains(sysDescr, "IOS-XE"):
 				m["os"] = "IOS XE"
-			} else {
+			default:
 				m["os"] = "IOS"
 			}
-		case strings.Contains(sysDescr, "NX-OS"):
+		case strings.Contains(sysDescr, "NX OS"), strings.Contains(sysDescr, "NX-OS"):
 			m["os"] = "NX-OS"
-		default:
-			m["os"] = ""
 		}
 	case strings.Contains(sysDescr, "Hewlett Packard"), strings.Contains(sysDescr, "HP"), strings.Contains(sysDescr, "ProCurve"):
 		m["vendor"] = "HP"
