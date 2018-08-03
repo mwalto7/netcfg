@@ -32,7 +32,7 @@ func TestGetValue(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			r := bufio.NewReader(strings.NewReader(test.input + string('\n')))
-			got, err := getVal(r, ioutil.Discard, "Enter test value:", test.defaultVal)
+			got, err := getVal("Enter test value:", test.defaultVal, r, ioutil.Discard)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

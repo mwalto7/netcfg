@@ -296,10 +296,11 @@ timeoutPrompt:
 
 // getVal prompts the user for a value
 func getVal(prompt string, value interface{}, r *bufio.Reader, w io.Writer) (string, error) {
-	if value == nil {
+	def := fmt.Sprintf("%v", value)
+	if value == nil || def == "" || def == "[]" {
 		fmt.Fprintf(w, "%s: ", prompt)
 	} else {
-		fmt.Fprintf(w, "%s (%v): ", prompt, value)
+		fmt.Fprintf(w, "%s (%s): ", prompt, def)
 	}
 	val, err := r.ReadString('\n')
 	if err != nil {
