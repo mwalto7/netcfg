@@ -83,6 +83,86 @@ config:
   - cmds:
       - "N"
 `
+	test = `
+---
+aliases:
+  - &cisco_default
+    vendor  : cisco
+    os      : ios
+    cmds: &cisco_cmds
+      0: conf t
+      1: # placeholder
+      2: exit
+      3: write mem
+      4: exit
+  - &hp_default
+    vendor  : hp
+    os      : comware
+    cmds: &hp_cmds
+      0: sys
+      1: # placeholder
+      2: quit
+      3: save force
+      4: quit
+config:
+  {{- range .template.cisco}}
+  - <<: *cisco_default
+    hostname: {{.hostname}}
+    cmds:
+      <<: *cisco_cmds
+      1: snmp-server location {{.location}}
+  {{- end}}
+  {{- range .template.hp}}
+  - <<: *hp_default
+    hostname: {{.hostname}}
+    cmds:
+      <<: *hp_cmds
+      1: snmp-agent sys-info location {{.location}}
+  {{- end}}
+`
+	testData = `
+---
+template:
+  cisco:
+    - hostname: switch-1
+      location: snmp-location-switch-1
+  hp:
+    - hostname: switch-2
+      location: snmp-location-switch-2
+`
+	testContents = `
+---
+aliases:
+  - &cisco_default
+    vendor  : cisco
+    os      : ios
+    cmds: &cisco_cmds
+      0: conf t
+      1: # placeholder
+      2: exit
+      3: write mem
+      4: exit
+  - &hp_default
+    vendor  : hp
+    os      : comware
+    cmds: &hp_cmds
+      0: sys
+      1: # placeholder
+      2: quit
+      3: save force
+      4: quit
+config:
+  - <<: *cisco_default
+    hostname: switch-1
+    cmds:
+      <<: *cisco_cmds
+      1: snmp-server location snmp-location-switch-1
+  - <<: *hp_default
+    hostname: switch-2
+    cmds:
+      <<: *hp_cmds
+      1: snmp-agent sys-info location snmp-location-switch-2
+`
 )
 
 type configTest struct {
@@ -151,6 +231,46 @@ var configParseTests = []configTest{
 		ok:   noError,
 		want: &Config{Pass: "testing123", Config: []cmdSet{{Cmds: []interface{}{"N"}}}},
 	},
+	{
+		name: "test",
+		data: testData,
+		src:  test,
+		ok:   noError,
+		want: &Config{
+			Aliases: []cmdSet{
+				{Vendor: "cisco", OS: "ios", Cmds: map[interface{}]interface{}{
+					0: "conf t",
+					1: "",
+					2: "exit",
+					3: "write mem",
+					4: "exit",
+				}},
+				{Vendor: "hp", OS: "comware", Cmds: map[interface{}]interface{}{
+					0: "sys",
+					1: "",
+					2: "quit",
+					3: "save force",
+					4: "quit",
+				}},
+			},
+			Config:  []cmdSet{
+				{Vendor: "cisco", OS: "ios", Hostname: "switch-1", Cmds: map[interface{}]interface{}{
+					0: "conf t",
+					1: "snmp-server location snmp-location-switch-1",
+					2: "exit",
+					3: "write mem",
+					4: "exit",
+				}},
+				{Vendor: "hp", OS: "comware", Hostname: "switch-2", Cmds: map[interface{}]interface{}{
+					0: "sys",
+					1: "snmp-agent sys-info location snmp-location-switch-2",
+					2: "quit",
+					3: "save force",
+					4: "quit",
+				}},
+			},
+		},
+	},
 }
 
 func TestNew(t *testing.T) {
@@ -204,6 +324,8 @@ func TestConfig_Parse(t *testing.T) {
 			test.want.name = test.name
 			test.want.data = test.data
 			switch test.name {
+			case "test":
+				test.want.contents = testContents
 			case "template":
 				test.want.contents = tmplContents
 			case "template functions":

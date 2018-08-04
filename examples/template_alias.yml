@@ -1,0 +1,56 @@
+# Example configuration combinig templates with aliases to change the snmp locations
+# on Cisco and HPE devices.
+#
+# DRY version of template.yml. See template_data.yml for the values being used.
+# Run `netcfg run examples/template_alias.yml -t examples/template_data.yml --dry-run` to test the output.
+
+# template_alias.yml
+---
+hosts  : cisco_hosts.txt # path to hosts file
+user   : user            # username for device login
+pass   : {{password}}    # prompt for password
+accept : all             # accept connections to all hosts
+timeout: 10s             # timeout after 10 seconds
+
+aliases:
+  # Default Cisco command set.
+  - &cisco_default
+    vendor: cisco
+    os: ios
+    cmds: &cisco_cmds
+      0: conf t
+      # placeholder for snmp location command
+      # key "1" will be inserted below
+      2: exit
+      3: write mem
+      4: exit
+
+  # Default HPE command set.
+  - &hp_default
+    vendor: hp
+    os: comware
+    cmds: &hp_cmds
+      0: sys
+      1: # placeholder for snmp location command; key "1" will be inserted below
+      2: quit
+      3: save force
+      4: quit
+
+config:
+  # Loop through all Cisco values in template_data.yml and fill in the data.
+  {{- range .template.cisco}}
+  - <<: *cisco_default
+    hostname: {{.hostname}}
+    cmds:
+      <<: *cisco_cmds
+      1: snmp-server location {{.location}}
+  {{- end}}
+
+  # Loop through all HPE values in template_data.yml and fill in the data.
+  {{- range .template.hp}}
+  - <<: *hp_default
+    hostname: {{.hostname}}
+    cmds:
+      <<: *hp_cmds
+      1: snmp-agent sys-info location {{.location}}
+  {{- end}}
