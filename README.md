@@ -1,7 +1,6 @@
 # netcfg
 
-Fast network device configuration.
-
+[![Build Status](https://travis-ci.org/mwalto7/netcfg.svg?branch=master)](https://travis-ci.org/mwalto7/netcfg)
 [![GoDoc](https://godoc.org/github.com/mwalto7/netcfg?status.svg)](https://godoc.org/github.com/mwalto7/netcfg)
 [![Go Report Card](https://goreportcard.com/badge/github.com/mwalto7/netcfg)](https://goreportcard.com/report/github.com/mwalto7/netcfg)
 
