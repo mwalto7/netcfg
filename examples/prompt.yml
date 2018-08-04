@@ -1,0 +1,20 @@
+# Example configuration using the prompt function to show all access points
+# connected to a Cisco wireless LAN controller.
+
+# prompt.yml
+---
+hosts  : hosts.txt          # path to hosts file
+user   : &user user         # username for controller login
+pass   : &pass {{password}} # prompt for password
+accept : all                # accept connections to all hosts
+timeout: 10s                # timeout after 10 seconds
+
+config:
+  - vendor: cisco
+    cmds:
+      - *user                 # send username
+      - *pass                 # send password
+      - config paging disable # disable "--more--" prompt
+      - show ap summary       # get all APs connected to the controller
+      - logout                # logout
+      - {{prompt "N"}}        # enter "N" when prompted to save

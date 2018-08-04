@@ -1,0 +1,33 @@
+# Example configuration for multiple Cisco models that have slightly different commands.
+
+# multi_model.yml
+---
+hosts  : cisco_hosts.txt # path to hosts file
+user   : user            # username for device login
+pass   : {{password}}    # prompt for password
+accept : all             # accept connections to all hosts
+timeout: 10s             # timeout after 10 seconds
+
+aliases:
+  # Default configuration for Cisco devices.
+  - &cisco_default
+    vendor: cisco
+    cmds: &cisco_cmds
+      0: terminal length 0
+      1: show version | include Model number
+      2: show boot | include BOOT path-list
+      3: "dir flash: | include bin$"
+      4: exit
+
+config:
+  # Add the default command set.
+  - *cisco_default
+
+  # Modify the default for c3650 models.
+  - <<: *cisco_default
+    models:
+      - c3650
+    cmds:
+      <<: *cisco_cmds
+      2: show boot | include BOOT variable
+      3: "dir bootflash: | include bin$"

@@ -1,0 +1,26 @@
+# Example configuration for multiple vendors.
+
+# multi_vendor.yml
+---
+hosts  : hosts.txt    # path to hosts file
+user   : user         # username for device login
+pass   : {{password}} # prompt for password
+accept : all          # accept connections to all hosts
+timeout: 10s          # timeout after 10 seconds
+
+config:
+  # Cisco IOS-specific commands.
+  - vendor: cisco
+    os: ios
+    cmds:
+      - terminal length 0   # disable "--more--" prompt
+      - show lldp neighbors # show neighbors
+      - exit                # logour
+
+  # HPE Comware-specific commands.
+  - vendor: hp
+    os: comware
+    cmds:
+      - screen-length disable      # disable "--more--" prompt
+      - display lldp neighbor list # show neighbors
+      - quit                       # logout

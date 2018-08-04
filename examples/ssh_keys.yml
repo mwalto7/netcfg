@@ -1,0 +1,19 @@
+# Example configuration using SSH keys for device login.
+
+# ssh_keys.yml
+---
+hosts: hosts.txt           # path to hosts file
+user: user                 # username for device login
+keys:                      # ssh private keys for device login
+  - /home/user/.ssh/id_rsa
+  - /home/user/.ssh/key2
+  # ...
+accept: known_hosts        # accept connections only to hosts in OpenSSH known_hosts file
+timeout: 5s                # timeout after 5 seconds
+
+config:
+  - vendor: cisco
+    cmds:
+      - terminal length 0  # disable "--more--" prompt
+      - show version       # show version info
+      - exit               # logout

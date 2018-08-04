@@ -1,0 +1,39 @@
+# Example configuration that uses Go's text templating capabilities for a custom configuration.
+#
+# See template_data.yml for the values being passed.
+# Run `netcfg run examples/template.yml -t examples/template_data.yml --dry-run` to test the output.
+
+# template.yml
+---
+hosts  : cisco_hosts.txt # path to hosts file
+user   : user            # username for device login
+pass   : {{password}}    # prompt for password
+accept : all             # accept connections to all hosts
+timeout: 10s             # timeout after 10 seconds
+
+config:
+  # Loop through all Cisco devices in template_data.yml and create a custom configuration set per host.
+  {{- range .template.cisco}} # "{{-" trims all left space
+  - vendor: cisco
+    os: ios
+    hostname: {{.hostname}}
+    cmds:
+      - conf t
+      - snmp-server location {{.location}}
+      - exit
+      - write mem
+      - exit
+  {{- end}} # "{{-" trims all left space
+
+  # Loop through all HPE devices in template_data.yml and create a custom configuration set per host.
+  {{- range .template.hp}} # "{{-" trims all left space
+  - vendor: hp
+    os: comware
+    hostname: {{.hostname}}
+    cmds:
+      - sys
+      - snmp-agent sys-info location {{.location}}
+      - quit
+      - save force
+      - quit
+  {{- end}} # "{{-" trims all left space

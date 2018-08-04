@@ -1,0 +1,16 @@
+# Example configuration for getting the neighbors of Cisco devices.
+
+# basic.yml
+---
+hosts  : cisco_hosts.txt # path to hosts file
+user   : user            # username for device login
+pass   : {{password}}    # prompt for password
+accept : all             # accept connections to all hosts
+timeout: 10s             # timeout after 10 seconds
+
+config:
+  - vendor: cisco
+    cmds:
+      - terminal length 0   # disable "--more--" prompt
+      - show lldp neighbors # show neighbors
+      - exit                # logout

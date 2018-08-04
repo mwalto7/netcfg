@@ -1,0 +1,12 @@
+# Template data for examples/template.yml.
+
+# template_data.yml
+---
+template:
+  cisco:
+    - hostname: switch-1
+      location: snmp-location-switch-1
+
+  hp:
+    - hostname: switch-2
+      location: snmp-location-switch-2
