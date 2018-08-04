@@ -145,11 +145,9 @@ func runInitCmd(_ *cobra.Command, args []string) error {
 		"timeout":     timeout,
 	}
 	if interactive {
-		itData, err := initIT(data)
-		if err != nil {
+		if err := it(data, os.Stdin); err != nil {
 			return err
 		}
-		data = itData
 	}
 	return initCfg(initTmpl, data)
 }
@@ -191,130 +189,122 @@ func initCfg(src string, data map[string]interface{}) error {
 	return nil
 }
 
-// initIT enables interactive mode for setting options for a new configuration file.
-func initIT(data map[string]interface{}) (map[string]interface{}, error) {
-	itData := make(map[string]interface{}, len(data))
-	r := bufio.NewReader(os.Stdin)
-	for k, v := range data {
-		var prompt string
-		switch val := v.(type) {
-		case string:
-			switch k {
-			case "description":
-				prompt = "Enter a description"
-			case "filename":
-				prompt = "Config file name"
-			case "hosts":
-				prompt = "Hosts file"
-			case "user":
-				prompt = "Username"
-			case "accept":
-			acceptPrompt:
-				for {
-					itVal, err := getVal(r, os.Stderr, "Allow connections to", val)
-					if err != nil {
-						return nil, err
-					}
-					switch itVal {
-					case "":
-						itData[k] = val
-						break acceptPrompt
-					case "all", "known_hosts":
-						itData[k] = itVal
-						break acceptPrompt
-					default:
-						fmt.Fprintf(os.Stderr, "expected all or known_hosts, got %q\n", itVal)
-						continue
-					}
-				}
+// it enables interactive mode for setting options for a new configuration file.
+func it(data map[string]interface{}, file *os.File) error {
+	r := bufio.NewReader(file)
+
+	d, err := getVal("Enter a description", data["description"], r, os.Stderr)
+	if err != nil {
+		return err
+	}
+	if d != "" {
+		data["description"] = d
+	}
+
+	f, err := getVal("Config file name", data["filename"], r, os.Stderr)
+	if err != nil {
+		return err
+	}
+	if f != "" {
+		data["filename"] = f
+	}
+
+	h, err := getVal("Hosts file", data["hosts"], r, os.Stderr)
+	if err != nil {
+		return err
+	}
+	if h != "" {
+		data["hosts"] = h
+	}
+
+	u, err := getVal("Username", data["user"], r, os.Stderr)
+	if err != nil {
+		return err
+	}
+	if u != "" {
+		data["user"] = u
+	}
+
+passPrompt:
+	for {
+		p, err := getVal("Use password authentication?", data["pass"], r, os.Stderr)
+		if err != nil {
+			return err
+		}
+		if p != "" {
+			switch strings.ToLower(p) {
+			case "t", "true", "y", "yes":
+				data["pass"] = true
+				break passPrompt
+			case "f", "false", "n", "no":
+				data["pass"] = false
+				break passPrompt
+			default:
+				fmt.Fprintf(os.Stderr, "Expected boolean, got %q\n", p)
 				continue
 			}
-			itVal, err := getVal(r, os.Stderr, prompt, val)
-			if err != nil {
-				return nil, err
-			}
-			if itVal == "" {
-				itData[k] = val
-			} else {
-				if k == "filename" && !strings.HasSuffix(itVal, ".yml") {
-					if !strings.HasSuffix(itVal, ".yaml") {
-						itVal += ".yml"
-					}
-				}
-				itData[k] = itVal
-			}
-		case bool:
-		pwprompt:
-			for {
-				itVal, err := getVal(r, os.Stderr, "Use password authentication?", val)
-				if err != nil {
-					return nil, err
-				}
-				switch strings.ToLower(itVal) {
-				case "":
-					itData[k] = val
-					break pwprompt
-				case "1", "y", "yes", "t", "true":
-					itData[k] = true
-					break pwprompt
-				case "0", "n", "no", "f", "false":
-					itData[k] = false
-					break pwprompt
-				default:
-					fmt.Fprintf(os.Stderr, "Expected boolean, got %q\n", itVal)
-					continue
-				}
-			}
-		case time.Duration:
-		tprompt:
-			for {
-				itVal, err := getVal(r, os.Stderr, "Connection timeout", val.String())
-				if err != nil {
-					return nil, err
-				}
-				if itVal == "" {
-					itData[k] = val
-					break tprompt
-				} else {
-					itTimeout, err := time.ParseDuration(itVal)
-					if err != nil {
-						fmt.Fprintln(os.Stderr, err)
-						continue
-					}
-					itData[k] = itTimeout
-					break tprompt
-				}
-			}
-		case []string:
-			itVal, err := getVal(r, os.Stderr, "Enter any SSH keys (comma separated)", keys)
-			if err != nil {
-				return nil, err
-			}
-			if itVal == "" {
-				itData[k] = val
-			} else {
-				keys := strings.Split(itVal, ",")
-				for i := range keys {
-					keys[i] = strings.TrimSpace(keys[i])
-				}
-				itData[k] = keys
+		}
+		break passPrompt
+	}
+
+	k, err := getVal("Enter any SSH private keys separated by comma", data["keys"], r, os.Stderr)
+	if err != nil {
+		return err
+	}
+	if k != "" {
+		data["keys"] = strings.Split(k, ",")
+	}
+
+acceptPrompt:
+	for {
+		a, err := getVal("Allow connections to", data["accept"], r, os.Stderr)
+		if err != nil {
+			return err
+		}
+		if a != "" {
+			switch a {
+			case "all", "known_hosts":
+				data["accept"] = a
+				break acceptPrompt
+			default:
+				fmt.Fprintf(os.Stderr, "Expected 'all' or 'known_hosts', got %q\n", a)
+				continue
 			}
 		}
+		break acceptPrompt
 	}
-	return itData, nil
+
+timeoutPrompt:
+	for {
+		t, err := getVal("Timeout after", data["timeout"], r, os.Stderr)
+		if err != nil {
+			return err
+		}
+		if t != "" {
+			to, err := time.ParseDuration(t)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Unable to parse %q: %v\n", t, err)
+				continue
+			}
+			data["timeout"] = to
+			break timeoutPrompt
+		}
+		break timeoutPrompt
+	}
+	return nil
 }
 
 // getVal prompts the user for a value
-func getVal(r *bufio.Reader, w io.Writer, s string, v interface{}) (string, error) {
-	str := fmt.Sprintf("%v", v)
-	if v == nil || str == "" || str == "[]" {
-		fmt.Fprintf(w, "%s: ", s)
+func getVal(prompt string, value interface{}, r *bufio.Reader, w io.Writer) (string, error) {
+	def := fmt.Sprintf("%v", value)
+	if value == nil || def == "" || def == "[]" {
+		fmt.Fprintf(w, "%s: ", prompt)
 	} else {
-		fmt.Fprintf(w, "%s (%v): ", s, v)
+		fmt.Fprintf(w, "%s (%s): ", prompt, def)
 	}
 	val, err := r.ReadString('\n')
 	if err != nil {
 		return "", err
 	}
-	return strings.TrimSpace(strings.TrimRight(val, string('\n'))), nil
+	return strings.TrimSpace(strings.Replace(val, string('\n'), "", -1)), nil
 }

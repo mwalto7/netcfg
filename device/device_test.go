@@ -1,8 +1,8 @@
 package device
 
 import (
-	"testing"
 	"fmt"
+	"testing"
 )
 
 func TestClient_Addr(t *testing.T) {
