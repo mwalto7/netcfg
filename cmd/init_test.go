@@ -7,7 +7,6 @@ import (
 	"io"
 	"fmt"
 	"io/ioutil"
-	"os"
 )
 
 func TestRunInitCmd(t *testing.T) {
@@ -19,29 +18,7 @@ func TestInitCfg(t *testing.T) {
 }
 
 func TestIT(t *testing.T) {
-	tests := []struct {
-		name string
-		data map[string]interface{}
-		vals []string
-		ok   bool
-	}{
-		{"nil", nil, nil, false},
-		{"empty", make(map[string]interface{}), make([]string, 0), false},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			err := it(test.data, os.Stdin)
-			switch {
-			case err != nil && test.ok:
-				t.Errorf("got unexpected error: %v", err)
-			case err == nil && !test.ok:
-				t.Errorf("expected error, got none")
-			case err != nil && !test.ok:
-				t.Logf("got expected error: %v", err)
-			}
-			t.Log(test.data)
-		})
-	}
+
 }
 
 func TestGetValue(t *testing.T) {
