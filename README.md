@@ -107,6 +107,8 @@ config:
       # ...
 ```
 
+See full examples in the [examples folder](https://github.com/mwalto7/netcfg/tree/master/examples).
+
 Currently supported devices include Cisco IOS, IOS XE, and IOS XR, and HP ProCurve and Comware. 
 More are to come in the future. If you would like a certain device to be supported, send the output of
 `snmpget host 1.3.6.1.2.1.1.1.0` to dev.mwalto7@gmail.com and I will try to implement it.
