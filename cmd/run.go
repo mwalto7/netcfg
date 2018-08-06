@@ -33,6 +33,7 @@ import (
 	"github.com/mwalto7/netcfg/device"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh"
+	"sync"
 )
 
 var (
@@ -139,9 +140,11 @@ func runCfg(cfg *config.Config) error {
 	numHosts := len(hosts)
 	fmt.Println("Number of hosts:", numHosts)
 	jobs := make(chan string, numHosts)
-	results := make(chan *result, numHosts)
+	results := make(chan result, numHosts)
 
+	var wg sync.WaitGroup
 	numWorkers := runtime.NumCPU() * workers
+	wg.Add(numWorkers)
 	for w := 0; w < numWorkers; w++ {
 		user := cfg.User
 		pass := cfg.Pass
@@ -157,8 +160,12 @@ func runCfg(cfg *config.Config) error {
 		clientCfg.SetDefaults()
 		clientCfg.Ciphers = append(clientCfg.Ciphers, "aes128-cbc", "aes256-cbc", "3des-cbc", "des-cbc", "aes192-cbc")
 
-		go connect(cfgCmds, clientCfg, jobs, results)
+		go connect(cfgCmds, clientCfg, jobs, results, &wg)
 	}
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
 
 	for _, host := range hosts {
 		jobs <- host
@@ -181,12 +188,14 @@ func runCfg(cfg *config.Config) error {
 
 // connect is a worker that creates a client connection to each host in `jobs`
 // then returns the open client connection.
-func connect(cfgCmds map[string][]string, clientCfg *ssh.ClientConfig, jobs <-chan string, results chan<- *result) {
+func connect(cfgCmds map[string][]string, clientCfg *ssh.ClientConfig, jobs <-chan string, results chan<- result, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	for host := range jobs {
 		clientCfg := clientCfg
 		client, err := device.Dial(host, "22", clientCfg)
 		if err != nil {
-			results <- &result{host, nil, err}
+			results <- result{host, nil, err}
 			return
 		}
 		cmds := make([]string, 0)
@@ -222,17 +231,17 @@ func connect(cfgCmds map[string][]string, clientCfg *ssh.ClientConfig, jobs <-ch
 			cmds = genericCmds
 		}
 		if len(cmds) == 0 {
-			results <- &result{host, nil, err}
+			results <- result{host, nil, err}
 			client.Close()
 			return
 		}
 		out, err := client.Run(cmds...)
 		if err != nil {
-			results <- &result{host, nil, err}
+			results <- result{host, nil, err}
 			client.Close()
 			return
 		}
-		results <- &result{client.String(), out, nil}
+		results <- result{client.String(), out, nil}
 		client.Close()
 	}
 }
