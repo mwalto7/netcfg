@@ -160,10 +160,7 @@ func runCfg(cfg *config.Config) error {
 
 		go connect(cfgCmds, clientCfg, jobs, results, &wg)
 	}
-	go func(devices chan *result, wg *sync.WaitGroup) {
-		wg.Wait()
-		close(devices)
-	}(results, &wg)
+	go wg.Wait()
 
 	for _, host := range hosts {
 		jobs <- host
