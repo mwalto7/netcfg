@@ -29,8 +29,6 @@ import (
 	"os"
 	"runtime"
 	"strings"
-	"sync"
-
 	"github.com/mwalto7/netcfg/config"
 	"github.com/mwalto7/netcfg/device"
 	"github.com/spf13/cobra"
@@ -142,9 +140,7 @@ func runCfg(cfg *config.Config) error {
 	jobs := make(chan string, numHosts)
 	results := make(chan *result, numHosts)
 
-	var wg sync.WaitGroup
 	numWorkers := runtime.NumCPU() * workers
-	wg.Add(numWorkers)
 	for w := 0; w < numWorkers; w++ {
 		user := cfg.User
 		pass := cfg.Pass
@@ -160,12 +156,8 @@ func runCfg(cfg *config.Config) error {
 		clientCfg.SetDefaults()
 		clientCfg.Ciphers = append(clientCfg.Ciphers, "aes128-cbc", "aes256-cbc", "3des-cbc", "des-cbc", "aes192-cbc")
 
-		go connect(cfgCmds, clientCfg, jobs, results, &wg)
+		go connect(cfgCmds, clientCfg, jobs, results)
 	}
-	go func() {
-		wg.Wait()
-		close(results)
-	}()
 
 	for _, host := range hosts {
 		jobs <- host
@@ -188,9 +180,7 @@ func runCfg(cfg *config.Config) error {
 
 // connect is a worker that creates a client connection to each host in `jobs`
 // then returns the open client connection.
-func connect(cfgCmds map[string][]string, clientCfg *ssh.ClientConfig, jobs <-chan string, results chan<- *result, wg *sync.WaitGroup) {
-	defer wg.Done()
-
+func connect(cfgCmds map[string][]string, clientCfg *ssh.ClientConfig, jobs <-chan string, results chan<- *result) {
 	for host := range jobs {
 		clientCfg := clientCfg
 		client, err := device.Dial(host, "22", clientCfg)
