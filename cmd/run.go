@@ -38,8 +38,9 @@ import (
 )
 
 var (
-	dryRun bool
-	tmpl   string
+	dryRun  bool
+	tmpl    string
+	workers int
 )
 
 // runCmd represents the run command
@@ -54,6 +55,7 @@ func init() {
 	runCmd.Flags().BoolVar(&dryRun, "dry-run", false, "test a configuration without configuring any hosts")
 	runCmd.Flags().StringVarP(&tmpl, "template", "t", "", "template data to use in configuration file")
 	runCmd.Flags().StringP("community", "c", "public", "SNMP v2c community string")
+	runCmd.Flags().IntVarP(&workers, "workers", "w", 1, "number of concurrent workers to run")
 }
 
 // runCmdRunE is the function fun for the `runCmd`.
@@ -141,7 +143,7 @@ func runCfg(cfg *config.Config) error {
 	results := make(chan *result, numHosts)
 
 	var wg sync.WaitGroup
-	numWorkers := runtime.NumCPU() * 12
+	numWorkers := runtime.NumCPU() * workers
 	wg.Add(numWorkers)
 	for w := 0; w < numWorkers; w++ {
 		user := cfg.User
@@ -160,7 +162,10 @@ func runCfg(cfg *config.Config) error {
 
 		go connect(cfgCmds, clientCfg, jobs, results, &wg)
 	}
-	go wg.Wait()
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
 
 	for _, host := range hosts {
 		jobs <- host
