@@ -113,11 +113,14 @@ type result struct {
 
 // runCfg is the `runCmd`'s main function.
 func runCfg(cfg *config.Config) error {
-	var hosts []string
+	// read hosts file from user config
 	hostsData, err := ioutil.ReadFile(cfg.Hosts)
 	if err != nil {
-		return err
+		return fmt.Errorf("run: failed to read %s: %v", cfg.Hosts, err)
 	}
+
+	// scan hosts line-by-line from hosts file
+	var hosts []string
 	s := bufio.NewScanner(bytes.NewReader(hostsData))
 	for s.Scan() {
 		line := s.Text()
@@ -125,57 +128,51 @@ func runCfg(cfg *config.Config) error {
 			hosts = append(hosts, line)
 		}
 	}
+	if err := s.Err(); err != nil {
+		return fmt.Errorf("run: error scanning %s: %v", cfg.Hosts, err)
+	}
 	if len(hosts) == 0 {
 		return errors.New("run: no hosts to configure")
 	}
 
+	// convert user config commands to map
 	cfgCmds, err := config.MapCmds(cfg)
 	if err != nil {
-		return err
+		return fmt.Errorf("run: could not map commands: %v", err)
 	}
 	if len(cfgCmds) == 0 {
 		return errors.New("run: no configuration commands to run")
 	}
 
-	numHosts := len(hosts)
-	fmt.Println("Number of hosts:", numHosts)
-	jobs := make(chan string, numHosts)
-	results := make(chan result, numHosts)
+	// the network devices to configure and their configuration results
+	devices := make(chan string, len(hosts))
+	results := make(chan result, len(hosts))
 
+	// start workers
 	var wg sync.WaitGroup
 	numWorkers := runtime.NumCPU() * workers
 	wg.Add(numWorkers)
 	for w := 0; w < numWorkers; w++ {
-		user := cfg.User
-		pass := cfg.Pass
-		timeout := cfg.Timeout
-		cfgCmds := cfgCmds
-
-		clientCfg := &ssh.ClientConfig{
-			User:            user,
-			Auth:            []ssh.AuthMethod{ssh.Password(pass)},
-			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-			Timeout:         timeout,
-		}
-		clientCfg.SetDefaults()
-		clientCfg.Ciphers = append(clientCfg.Ciphers, "aes128-cbc", "aes256-cbc", "3des-cbc", "des-cbc", "aes192-cbc")
-
-		go connect(cfgCmds, clientCfg, jobs, results, &wg)
+		cfg := cfg
+		cmds := cfgCmds
+		go configure(cmds, cfg, devices, results, &wg)
 	}
 	go func() {
 		wg.Wait()
 		close(results)
 	}()
 
+	// send jobs to the workers
 	for _, host := range hosts {
-		jobs <- host
+		devices <- host
 	}
-	close(jobs)
+	close(devices)
 
-	for i := 0; i < numHosts; i++ {
+	// read the results
+	for i := 0; i < len(hosts); i++ {
 		res, ok := <-results
 		if !ok {
-			return nil
+			return errors.New("run: error reading results, nil channel")
 		}
 		if res.err != nil {
 			fmt.Fprintf(os.Stderr, "%s error: %v\n", res.host, res.err)
@@ -186,18 +183,32 @@ func runCfg(cfg *config.Config) error {
 	return nil
 }
 
-// connect is a worker that creates a client connection to each host in `jobs`
+// configure is a worker that creates a client connection to each host in `devices`
 // then returns the open client connection.
-func connect(cfgCmds map[string][]string, clientCfg *ssh.ClientConfig, jobs <-chan string, results chan<- result, wg *sync.WaitGroup) {
+func configure(cfgCmds map[string][]string, cfg *config.Config, devices <-chan string, results chan<- result, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	for host := range jobs {
-		clientCfg := clientCfg
+	for host := range devices {
+		cfg := cfg
+		cfgCmds := cfgCmds
+
+		clientCfg := &ssh.ClientConfig{
+			User:            cfg.User,
+			Auth:            []ssh.AuthMethod{ssh.Password(cfg.Pass)},
+			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+			Timeout:         cfg.Timeout,
+		}
+		clientCfg.SetDefaults()
+		clientCfg.Ciphers = append(clientCfg.Ciphers, "aes128-cbc", "aes256-cbc", "3des-cbc", "des-cbc", "aes192-cbc")
+
+		// establish client connection to remote device
 		client, err := device.Dial(host, "22", clientCfg)
 		if err != nil {
-			results <- result{host, nil, err}
-			return
+			results <- result{host, nil, fmt.Errorf("failed to dial %s: %v", host, err)}
+			continue
 		}
+
+		// choose the right command set to send to the remote device
 		cmds := make([]string, 0)
 		for k, v := range cfgCmds {
 			m := make(map[string]string)
@@ -207,22 +218,12 @@ func connect(cfgCmds map[string][]string, clientCfg *ssh.ClientConfig, jobs <-ch
 				opts[1] = strings.Replace(opts[1], `"`, "", -1)
 				m[opts[0]] = strings.TrimSpace(strings.ToLower(opts[1]))
 			}
-			if m["IP Addr"] != "" && m["IP Addr"] != strings.ToLower(client.Addr()) {
-				continue
-			}
-			if m["Hostname"] != "" && m["Hostname"] != strings.ToLower(client.Hostname()) {
-				continue
-			}
-			if m["Vendor"] != "" && m["Vendor"] != strings.ToLower(client.Vendor()) {
-				continue
-			}
-			if m["OS"] != "" && m["OS"] != strings.ToLower(client.OS()) {
-				continue
-			}
-			if m["Model"] != "" && m["Model"] != strings.ToLower(client.Model()) {
-				continue
-			}
-			if m["Version"] != "" && m["Version"] != strings.ToLower(client.Version()) {
+			if m["IP Addr"] != "" && m["IP Addr"] != strings.ToLower(client.Addr()) ||
+				m["Hostname"] != "" && m["Hostname"] != strings.ToLower(client.Hostname()) ||
+				m["Vendor"] != "" && m["Vendor"] != strings.ToLower(client.Vendor()) ||
+				m["OS"] != "" && m["OS"] != strings.ToLower(client.OS()) ||
+				m["Model"] != "" && m["Model"] != strings.ToLower(client.Model()) ||
+				m["Version"] != "" && m["Version"] != strings.ToLower(client.Version()) {
 				continue
 			}
 			cmds = v
@@ -231,15 +232,17 @@ func connect(cfgCmds map[string][]string, clientCfg *ssh.ClientConfig, jobs <-ch
 			cmds = genericCmds
 		}
 		if len(cmds) == 0 {
-			results <- result{host, nil, err}
+			results <- result{host, nil, fmt.Errorf("no commands to run")}
 			client.Close()
-			return
+			continue
 		}
+
+		// run the commands on the remote device
 		out, err := client.Run(cmds...)
 		if err != nil {
-			results <- result{host, nil, err}
+			results <- result{host, nil, fmt.Errorf("failed to run commands: %v", err)}
 			client.Close()
-			return
+			continue
 		}
 		results <- result{client.String(), out, nil}
 		client.Close()
