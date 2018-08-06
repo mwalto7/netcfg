@@ -137,6 +137,7 @@ func runCfg(cfg *config.Config) error {
 	}
 
 	numHosts := len(hosts)
+	fmt.Println("Number of hosts:", numHosts)
 	jobs := make(chan string, numHosts)
 	results := make(chan *result, numHosts)
 
