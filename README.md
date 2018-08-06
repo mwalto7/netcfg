@@ -1,10 +1,4 @@
-# netcfg
-
-[![Build Status](https://travis-ci.com/mwalto7/netcfg.svg?branch=master)](https://travis-ci.com/mwalto7/netcfg)
-[![GoDoc](https://godoc.org/github.com/mwalto7/netcfg?status.svg)](https://godoc.org/github.com/mwalto7/netcfg)
-[![Go Report Card](https://goreportcard.com/badge/github.com/mwalto7/netcfg)](https://goreportcard.com/report/github.com/mwalto7/netcfg)
-
-## Overview
+# netcfg [![Build Status](https://travis-ci.com/mwalto7/netcfg.svg?branch=master)](https://travis-ci.com/mwalto7/netcfg) [![Go Report Card](https://goreportcard.com/badge/github.com/mwalto7/netcfg)](https://goreportcard.com/report/github.com/mwalto7/netcfg) [![GoDoc](https://godoc.org/github.com/mwalto7/netcfg?status.svg)](https://godoc.org/github.com/mwalto7/netcfg)
 
 netcfg is a command line tool for fast, configurable network device 
 configuration written in [Go](https://golang.org). It supports multi-host, 
@@ -171,18 +165,17 @@ Global Flags:
 The run command executes a configuration file and configures the specified hosts.
 
 ```
-$ netcfg run --help
-
 Run a configuration
 
 Usage:
-  netcfg run file [flags]
+  netcfg run [flags]
 
 Flags:
   -c, --community string   SNMP v2c community string (default "public")
       --dry-run            test a configuration without configuring any hosts
   -h, --help               help for run
   -t, --template string    template data to use in configuration file
+  -w, --workers int        number of workers to run, more = faster (default 1)
 
 Global Flags:
       --config string   config file (default is $HOME/.netcfg.yml)

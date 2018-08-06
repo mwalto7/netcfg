@@ -54,7 +54,7 @@ func init() {
 	runCmd.Flags().BoolVar(&dryRun, "dry-run", false, "test a configuration without configuring any hosts")
 	runCmd.Flags().StringVarP(&tmpl, "template", "t", "", "template data to use in configuration file")
 	runCmd.Flags().StringP("community", "c", "public", "SNMP v2c community string")
-	runCmd.Flags().IntVarP(&workers, "workers", "w", 1, "number of concurrent workers to run")
+	runCmd.Flags().IntVarP(&workers, "workers", "w", 1, "number of workers to run, more = faster")
 }
 
 // runCmdRunE is the function fun for the `runCmd`.
