@@ -29,11 +29,12 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync"
+
 	"github.com/mwalto7/netcfg/config"
 	"github.com/mwalto7/netcfg/device"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh"
-	"sync"
 )
 
 var (
@@ -59,23 +60,19 @@ func init() {
 
 // runCmdRunE is the function fun for the `runCmd`.
 func runCmdRunE(_ *cobra.Command, args []string) error {
-	var cfgData, tmplData string
-
-	b, err := ioutil.ReadFile(args[0])
+	cfgData, err := ioutil.ReadFile(args[0])
 	if err != nil {
 		return err
 	}
-	cfgData = string(b)
-
+	var tmplData []byte
 	if tmpl != "" {
 		b, err := ioutil.ReadFile(tmpl)
 		if err != nil {
 			return err
 		}
-		tmplData = string(b)
+		tmplData = b
 	}
-
-	cfg, err := config.New("cfg").Data(tmplData).Parse(cfgData)
+	cfg, err := config.New("cfg").Data(tmplData).Parse(string(cfgData))
 	if err != nil {
 		return err
 	}

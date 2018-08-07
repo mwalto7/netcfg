@@ -1,10 +1,10 @@
 package config
 
 import (
-	"testing"
 	"bytes"
-	"path/filepath"
 	"io/ioutil"
+	"path/filepath"
+	"testing"
 )
 
 func TestNew(t *testing.T) {

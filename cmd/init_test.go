@@ -2,11 +2,11 @@ package cmd
 
 import (
 	"bufio"
+	"fmt"
+	"io"
+	"io/ioutil"
 	"strings"
 	"testing"
-	"io"
-	"fmt"
-	"io/ioutil"
 )
 
 func TestRunInitCmd(t *testing.T) {
