@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"strings"
 	"text/template"
@@ -37,9 +36,9 @@ type Config struct {
 	Aliases []cmdSet      `yaml:"aliases"` // aliases for configuration command sets
 	Config  []cmdSet      `yaml:"config"`  // sets of configuration commands to run
 
-	name     string // name of this config
-	data     string // template data for this config
-	contents string // contents of the parsed configuration
+	name string // name of this config
+	data string // template data for this config
+	text string // text of the parsed configuration
 }
 
 // New creates a new configuration.
@@ -70,24 +69,21 @@ func (c *Config) Parse(src string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	pr, pw := io.Pipe()
 	go func(pw *io.PipeWriter, data interface{}) {
-		defer pw.Close()
 		if err := tmpl.Execute(pw, &data); err != nil {
 			pw.CloseWithError(err)
 			return
 		}
+		pw.Close()
 	}(pw, data)
 
 	var buf bytes.Buffer
 	if err := v.ReadConfig(io.TeeReader(pr, &buf)); err != nil {
 		return nil, err
 	}
-	b, err := ioutil.ReadAll(&buf)
-	if err != nil {
-		return nil, err
-	}
-	c.contents = string(b)
+	c.text = buf.String()
 
 	if err := v.Unmarshal(c); err != nil {
 		return nil, err
@@ -135,12 +131,18 @@ func prompt(v interface{}) (string, error) {
 
 // Name returns the name of this Config.
 func (c *Config) Name() string {
+	if c == nil {
+		return "<nil>"
+	}
 	return c.name
 }
 
 // String returns the string representation of this Config.
 func (c *Config) String() string {
-	return c.contents
+	if c == nil {
+		return "<nil>"
+	}
+	return c.text
 }
 
 // MapCmds prints a map from options to commands.

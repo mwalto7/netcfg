@@ -313,7 +313,7 @@ func TestConfig_String(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if got.String() != got.contents || got.String() != options {
+	if got.String() != got.text || got.String() != options {
 		t.Errorf("want %s, got %s", options, got.String())
 	}
 }
@@ -325,13 +325,13 @@ func TestConfig_Parse(t *testing.T) {
 			test.want.data = test.data
 			switch test.name {
 			case "test":
-				test.want.contents = testContents
+				test.want.text = testContents
 			case "template":
-				test.want.contents = tmplContents
+				test.want.text = tmplContents
 			case "template functions":
-				test.want.contents = tmplFuncsContents
+				test.want.text = tmplFuncsContents
 			default:
-				test.want.contents = test.src
+				test.want.text = test.src
 			}
 		}
 		t.Run(test.name, func(t *testing.T) {
@@ -383,7 +383,7 @@ func configsEqual(x, y *Config) bool {
 	}
 	return x.name == y.name &&
 		x.data == y.data &&
-		x.contents == y.contents &&
+		x.text == y.text &&
 		optionsEqual(x, y) &&
 		cmdSetsEqual(x.Aliases, y.Aliases) &&
 		cmdSetsEqual(x.Config, y.Config)
