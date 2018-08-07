@@ -75,7 +75,7 @@ func runCmdRunE(_ *cobra.Command, args []string) error {
 		tmplData = string(b)
 	}
 
-	cfg, err := config.New("cfg").Template(tmplData).Parse(cfgData)
+	cfg, err := config.New("cfg").Data(tmplData).Parse(cfgData)
 	if err != nil {
 		return err
 	}

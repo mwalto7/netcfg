@@ -1,277 +1,11 @@
 package config
 
 import (
-	"fmt"
 	"testing"
-	"time"
+	"bytes"
+	"path/filepath"
+	"io/ioutil"
 )
-
-const (
-	noError  = true
-	hasError = false
-)
-
-// TODO: Use data from testdata folder.
-const (
-	options = `
----
-hosts: hosts.txt
-user: user
-pass: password
-keys:
-  - /home/user/.ssh/id_rsa
-accept: all
-timeout: 10s
-`
-	aliases = `
----
-aliases:
-  - &cisco_default
-    vendor: cisco
-    cmds: &cisco_cmds
-      0: show lldp neighbors
-      1: quit
-
-config:
-  - *cisco_default
-  - <<: *cisco_default
-    models:
-      - c2960s
-    cmds:
-      <<: *cisco_cmds
-      1: write mem
-      2: quit
-`
-	tmpl = `
----
-config:
-  {{- range .template}}
-  - hostname: {{.hostname}}
-    cmds:
-      - snmp-agent location {{.location}}
-  {{- end}}
-`
-	tmplData = `
----
-template:
-  - hostname: host1
-    location: host1_snmp_location
-  - hostname: host2
-    location: host2_snmp_location
-`
-	tmplContents = `
----
-config:
-  - hostname: host1
-    cmds:
-      - snmp-agent location host1_snmp_location
-  - hostname: host2
-    cmds:
-      - snmp-agent location host2_snmp_location
-`
-	tmplFuncs = `
----
-pass: {{password "testing123"}}
-config:
-  - cmds:
-      - {{prompt "N"}}
-`
-	tmplFuncsContents = `
----
-pass: testing123
-config:
-  - cmds:
-      - "N"
-`
-	test = `
----
-aliases:
-  - &cisco_default
-    vendor  : cisco
-    os      : ios
-    cmds: &cisco_cmds
-      0: conf t
-      1: # placeholder
-      2: exit
-      3: write mem
-      4: exit
-  - &hp_default
-    vendor  : hp
-    os      : comware
-    cmds: &hp_cmds
-      0: sys
-      1: # placeholder
-      2: quit
-      3: save force
-      4: quit
-config:
-  {{- range .template.cisco}}
-  - <<: *cisco_default
-    hostname: {{.hostname}}
-    cmds:
-      <<: *cisco_cmds
-      1: snmp-server location {{.location}}
-  {{- end}}
-  {{- range .template.hp}}
-  - <<: *hp_default
-    hostname: {{.hostname}}
-    cmds:
-      <<: *hp_cmds
-      1: snmp-agent sys-info location {{.location}}
-  {{- end}}
-`
-	testData = `
----
-template:
-  cisco:
-    - hostname: switch-1
-      location: snmp-location-switch-1
-  hp:
-    - hostname: switch-2
-      location: snmp-location-switch-2
-`
-	testContents = `
----
-aliases:
-  - &cisco_default
-    vendor  : cisco
-    os      : ios
-    cmds: &cisco_cmds
-      0: conf t
-      1: # placeholder
-      2: exit
-      3: write mem
-      4: exit
-  - &hp_default
-    vendor  : hp
-    os      : comware
-    cmds: &hp_cmds
-      0: sys
-      1: # placeholder
-      2: quit
-      3: save force
-      4: quit
-config:
-  - <<: *cisco_default
-    hostname: switch-1
-    cmds:
-      <<: *cisco_cmds
-      1: snmp-server location snmp-location-switch-1
-  - <<: *hp_default
-    hostname: switch-2
-    cmds:
-      <<: *hp_cmds
-      1: snmp-agent sys-info location snmp-location-switch-2
-`
-)
-
-type configTest struct {
-	name string
-	data string
-	src  string
-	ok   bool
-	want *Config
-}
-
-var configParseTests = []configTest{
-	{
-		name: "empty",
-		data: "",
-		src:  "",
-		ok:   hasError,
-		want: nil,
-	},
-	{
-		name: "options",
-		data: "",
-		src:  options,
-		ok:   noError,
-		want: &Config{
-			Hosts:   "hosts.txt",
-			User:    "user",
-			Pass:    "password",
-			Keys:    []string{"/home/user/.ssh/id_rsa"},
-			Accept:  "all",
-			Timeout: 10 * time.Second,
-		},
-	},
-	{
-		name: "aliases",
-		data: "",
-		src:  aliases,
-		ok:   noError,
-		want: &Config{
-			Aliases: []cmdSet{
-				{Vendor: "cisco", Cmds: map[interface{}]interface{}{0: "show lldp nieghbors", 1: "quit"}},
-			},
-			Config: []cmdSet{
-				{Vendor: "cisco", Cmds: map[interface{}]interface{}{0: "show lldp nieghbors", 1: "quit"}},
-				{Vendor: "cisco", Models: []string{"c2960s"},
-					Cmds: map[interface{}]interface{}{0: "show lldp nieghbors", 1: "write mem", 2: "quit"},
-				},
-			},
-		},
-	},
-	{
-		name: "template",
-		data: tmplData,
-		src:  tmpl,
-		ok:   noError,
-		want: &Config{
-			Config: []cmdSet{
-				{Hostname: "host1", Cmds: []interface{}{"snmp-agent location host1_snmp_location"}},
-				{Hostname: "host2", Cmds: []interface{}{"snmp-agent location host2_snmp_location"}},
-			},
-		},
-	},
-	{
-		name: "template functions",
-		data: "",
-		src:  tmplFuncs,
-		ok:   noError,
-		want: &Config{Pass: "testing123", Config: []cmdSet{{Cmds: []interface{}{"N"}}}},
-	},
-	{
-		name: "test",
-		data: testData,
-		src:  test,
-		ok:   noError,
-		want: &Config{
-			Aliases: []cmdSet{
-				{Vendor: "cisco", OS: "ios", Cmds: map[interface{}]interface{}{
-					0: "conf t",
-					1: "",
-					2: "exit",
-					3: "write mem",
-					4: "exit",
-				}},
-				{Vendor: "hp", OS: "comware", Cmds: map[interface{}]interface{}{
-					0: "sys",
-					1: "",
-					2: "quit",
-					3: "save force",
-					4: "quit",
-				}},
-			},
-			Config:  []cmdSet{
-				{Vendor: "cisco", OS: "ios", Hostname: "switch-1", Cmds: map[interface{}]interface{}{
-					0: "conf t",
-					1: "snmp-server location snmp-location-switch-1",
-					2: "exit",
-					3: "write mem",
-					4: "exit",
-				}},
-				{Vendor: "hp", OS: "comware", Hostname: "switch-2", Cmds: map[interface{}]interface{}{
-					0: "sys",
-					1: "snmp-agent sys-info location snmp-location-switch-2",
-					2: "quit",
-					3: "save force",
-					4: "quit",
-				}},
-			},
-		},
-	},
-}
 
 func TestNew(t *testing.T) {
 	name := "test"
@@ -282,98 +16,150 @@ func TestNew(t *testing.T) {
 	}
 }
 
-func TestConfig_Template(t *testing.T) {
-	const tmplSrc = `
----
-template:
-  cisco:
-    - host: cisco_host
-      location: cisco_snmp_location
-  hp:
-    - host: hp_host
-      location: hp_snmp_location_2
-`
-	got := New("tmpl").Template(tmplSrc)
-	want := &Config{name: "tmpl", data: tmplSrc}
+func TestConfig_Name(t *testing.T) {
+	var cfg *Config
+	if cfg.Name() != "<nil>" {
+		t.Errorf("want <nil>, got %v", cfg.Name())
+	}
+	name := "test"
+	cfg = New(name)
+	if cfg.Name() != name {
+		t.Errorf("want %s, got %s", name, cfg.name)
+	}
+}
+
+func TestConfig_Data(t *testing.T) {
+	data, err := ioutil.ReadFile(filepath.Join("testdata", "tmpl_data.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cfg *Config
+	if cfg.Data(data) != nil {
+		t.Errorf("expected nil, got %v", cfg)
+	}
+	got := New("cfg").Data(data)
+	want := &Config{name: "cfg", data: data}
+	if got == nil {
+		t.Errorf("config is nil, expected %v", want)
+	}
+	if !bytes.Equal(got.data, data) {
+		t.Errorf("want %v, got %v", data, got.data)
+	}
 	if !configsEqual(got, want) {
 		t.Errorf("want %v, got %v", want, got)
 	}
 }
 
-func TestConfig_Name(t *testing.T) {
-	want := "test"
-	got := New(want)
-	if got.Name() != want {
-		t.Errorf("want %s, got %s", want, got.Name())
-	}
+type configTest struct {
+	name string
+	cfg  *Config
+	src  string
+	data string
+	want *Config
+	ok   bool
 }
 
-func TestConfig_String(t *testing.T) {
-	got, err := New("test").Parse(options)
-	if err != nil {
-		t.Error(err)
-	}
-	if got.String() != got.text || got.String() != options {
-		t.Errorf("want %s, got %s", options, got.String())
-	}
+var configTests = []configTest{
+	{"nil", nil, "empty.yml", "", nil, false},
+	{"empty", New("empty"), "empty.yml", "", nil, false},
+	{
+		name: "data",
+		cfg:  New("data"),
+		src:  "tmpl.yml",
+		data: "tmpl_data.yml",
+		want: &Config{
+			Config: []cmdSet{
+				{Hostname: "host1", Cmds: []interface{}{"snmp-agent location host1_snmp_location"}},
+				{Hostname: "host2", Cmds: []interface{}{"snmp-agent location host2_snmp_location"}},
+			},
+			name: "data",
+			text: `---
+config:
+  - hostname: host1
+    cmds:
+      - snmp-agent location host1_snmp_location
+  - hostname: host2
+    cmds:
+      - snmp-agent location host2_snmp_location`,
+		},
+		ok: true,
+	},
+	{
+		name: "funcs",
+		cfg:  New("funcs"),
+		src:  "tmpl_funcs.yml",
+		data: "",
+		want: &Config{
+			Pass: "testing123",
+			Config: []cmdSet{
+				{Cmds: []interface{}{`"N"`}},
+			},
+			name: "funcs",
+			text: `---
+pass: testing123
+config:
+- cmds:
+  - "N"`,
+		},
+		ok: true,
+	},
 }
 
 func TestConfig_Parse(t *testing.T) {
-	for _, test := range configParseTests {
-		if test.want != nil {
-			test.want.name = test.name
-			test.want.data = test.data
-			switch test.name {
-			case "test":
-				test.want.text = testContents
-			case "template":
-				test.want.text = tmplContents
-			case "template functions":
-				test.want.text = tmplFuncsContents
-			default:
-				test.want.text = test.src
-			}
-		}
+	for _, test := range configTests {
 		t.Run(test.name, func(t *testing.T) {
-			got, err := New(test.name).Template(test.data).Parse(test.src)
+			src, err := ioutil.ReadFile(filepath.Join("testdata", test.src))
+			if err != nil {
+				t.Fatal(err)
+			}
+			data := make([]byte, 0)
+			if test.data != "" {
+				b, err := ioutil.ReadFile(filepath.Join("testdata", test.data))
+				if err != nil {
+					t.Fatal(err)
+				}
+				data = b
+				test.want.data = b
+			}
+			got, err := test.cfg.Data(data).Parse(string(src))
 			switch {
 			case err != nil && test.ok:
 				t.Errorf("unexpected error: %v", err)
 			case err == nil && !test.ok:
-				t.Error("expected error, got none")
+				t.Errorf("expected error, got none")
 			case err != nil && !test.ok:
 				t.Logf("got expected error: %v", err)
 			}
 			if !configsEqual(got, test.want) {
-				t.Errorf("\nwant: %v\ngot: %v", test.want, got)
+				t.Errorf("want %v, got %v", test.want, got)
 			}
 		})
 	}
 }
 
-func TestMapCmds(t *testing.T) {
-	cfg, err := New("cfg").Parse(aliases)
+func TestConfig_String(t *testing.T) {
+	var cfg *Config
+	if cfg.String() != "<nil>" {
+		t.Errorf("want <nil>, got %s", cfg.String())
+	}
+	src, err := ioutil.ReadFile(filepath.Join("testdata", "options.yml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	cmds, err := MapCmds(cfg)
+	cfg, err = New("test").Parse(string(src))
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
-	s := "IP Addr: %s, Hostname: %q, Vendor: %q, OS: %q, Model: %q, Version: %q"
-	ciscoDefaultCmds, ok := cmds[fmt.Sprintf(s, "", "", "cisco", "", "", "")]
-	if !ok {
-		t.Errorf("key not in cmdMap")
-	}
-	if !slicesEqual(ciscoDefaultCmds, []string{"show lldp neighbors", "quit"}) {
-		t.Errorf("commands do not match")
-	}
-	ciscoModifiedCmds, ok := cmds[fmt.Sprintf(s, "", "", "cisco", "", "c2960s", "")]
-	if !ok {
-		t.Errorf("key not in cmdMap")
-	}
-	if !slicesEqual(ciscoModifiedCmds, []string{"show lldp neighbors", "write mem", "quit"}) {
-		t.Errorf("commands do not match")
+	want := `---
+hosts: hosts.txt
+user: user
+pass: password
+keys:
+  - /home/user/.ssh/id_rsa
+accept: all
+timeout: 10s`
+	if cfg.String() != want {
+		t.Errorf("want %q, got %q", want, cfg.String())
 	}
 }
 
@@ -382,7 +168,7 @@ func configsEqual(x, y *Config) bool {
 		return x == nil && y == nil
 	}
 	return x.name == y.name &&
-		x.data == y.data &&
+		bytes.Equal(x.data, y.data) &&
 		x.text == y.text &&
 		optionsEqual(x, y) &&
 		cmdSetsEqual(x.Aliases, y.Aliases) &&
@@ -414,7 +200,6 @@ func cmdSetsEqual(x, y []cmdSet) bool {
 			slicesEqual(toStringSlice(xset.Cmds), toStringSlice(xset.Cmds)) {
 			return false
 		}
-
 	}
 	return true
 }
@@ -441,6 +226,8 @@ func toStringSlice(x interface{}) (s []string) {
 		for i := 0; i < len(v); i++ {
 			s = append(s, v[i].(string))
 		}
+	default:
+		return make([]string, 0)
 	}
 	return s
 }

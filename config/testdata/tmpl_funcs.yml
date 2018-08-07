@@ -1,5 +1,5 @@
 ---
-pass: {{password "testing123"}}
+pass: {{password "test" "testing123"}}
 config:
-  - cmds:
-      - {{prompt "N"}}
+- cmds:
+  - {{prompt "N"}}

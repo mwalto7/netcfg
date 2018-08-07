@@ -1,3 +1,6 @@
+# Configuration fpr testing YAML aliases.
+
+# aliases.yml
 ---
 aliases:
   - &cisco_default

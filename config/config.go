@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"strings"
 	"text/template"
@@ -37,7 +38,7 @@ type Config struct {
 	Config  []cmdSet      `yaml:"config"`  // sets of configuration commands to run
 
 	name string // name of this config
-	data string // template data for this config
+	data []byte // template data for this config
 	text string // text of the parsed configuration
 }
 
@@ -46,80 +47,123 @@ func New(name string) *Config {
 	return &Config{name: name}
 }
 
-// Template adds template data to a Config for use in parsing.
-func (c *Config) Template(src string) *Config {
+// Data adds template data to a Config for use cfg parsing.
+func (c *Config) Data(src []byte) *Config {
+	if c == nil {
+		return nil
+	}
 	c.data = src
 	return c
 }
 
 // Parse parses a Config with any template data.
 func (c *Config) Parse(src string) (*Config, error) {
+	if c == nil {
+		return nil, errors.New("cannot parse a nil Config")
+	}
 	if src == "" {
 		return nil, errors.New("nothing to parse, config file is empty")
 	}
+
+	// create a new text template
 	tmpl, err := template.New("cfg").Funcs(template.FuncMap{"password": getPass, "prompt": prompt}).Parse(src)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse template %s: %v", tmpl.Name(), err)
 	}
 
+	// create a new viper instance
 	v := viper.New()
 	v.SetConfigType("yaml")
 
-	data, err := unmarshal(v, c.data)
-	if err != nil {
-		return nil, err
+	// read cfg any config data
+	if err := v.ReadConfig(bytes.NewReader(c.data)); err != nil {
+		return nil, fmt.Errorf("could not read config data: %v", err)
 	}
 
+	// unmarshal any config data
+	var data interface{}
+	if err := v.Unmarshal(&data); err != nil {
+		return nil, fmt.Errorf("could not unmarshal config data: %v", err)
+	}
+
+	// execute the text template and copy into a pipe
 	pr, pw := io.Pipe()
-	go func(pw *io.PipeWriter, data interface{}) {
+	go func() {
 		if err := tmpl.Execute(pw, &data); err != nil {
-			pw.CloseWithError(err)
+			pw.CloseWithError(fmt.Errorf("could not execute %s: %v", tmpl.Name(), err))
 			return
 		}
 		pw.Close()
-	}(pw, data)
+	}()
 
+	// read the executed text template's contents and
+	// copy the output to a buffer
 	var buf bytes.Buffer
 	if err := v.ReadConfig(io.TeeReader(pr, &buf)); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not read config: %v", err)
 	}
 	c.text = buf.String()
 
+	// unmarshal the text template's contents into the Config
 	if err := v.Unmarshal(c); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not unmarshal config: %v", err)
 	}
 	return c, nil
 }
 
-// unmarshal reads in a src string and decodes the data.
-func unmarshal(v *viper.Viper, src string) (data interface{}, err error) {
-	if src == "" {
-		return
-	}
-	if err = v.ReadConfig(strings.NewReader(src)); err != nil {
-		return
-	}
-	if err = v.Unmarshal(&data); err != nil {
-		return
-	}
-	return
-}
-
-// getPass is a function used in text templates for prompting for a password.
+// getPass is a function used cfg text templates for prompting for a password.
 func getPass(s ...string) (string, error) {
-	if len(s) > 0 {
-		return s[0], nil
+	var (
+		in  *os.File
+		out io.Writer
+	)
+	switch len(s) {
+	case 0:
+		in = os.Stdin
+		out = os.Stdout
+	case 2:
+		if s[0] == "test" {
+			f, err := ioutil.TempFile("", "")
+			if err != nil {
+				return "", nil
+			}
+			defer func() {
+				f.Close()
+				os.Remove(f.Name())
+			}()
+			in = f
+			out = ioutil.Discard
+		}
+	default:
+		return "", fmt.Errorf("expected 0 or 2 args, got %d", len(s))
 	}
-	fmt.Fprintf(os.Stderr, "Password: ")
-	password, err := terminal.ReadPassword(int(os.Stdin.Fd()))
-	if err != nil {
+	if _, err := fmt.Fprintf(out, "Password: "); err != nil {
 		return "", err
 	}
-	fmt.Fprintln(os.Stderr)
-	return string(password), nil
+	var password string
+	if in == os.Stdin {
+		pass, err := terminal.ReadPassword(int(in.Fd()))
+		if err != nil {
+			return "", err
+		}
+		password = string(pass)
+	} else {
+		if _, err := io.WriteString(in, s[1]); err != nil {
+			return "", err
+		}
+		pass, err := ioutil.ReadFile(in.Name())
+		if err != nil {
+			return "", nil
+		}
+		password = string(pass)
+	}
+	if _, err := fmt.Fprintln(out); err != nil {
+		return "", err
+	}
+	return password, nil
 }
 
-// prompt is a function fused in text templates to enter the specified value
+// prompt is a function fused cfg text templates to enter the specified value
 // at an expected prompt on the remote session.
 func prompt(v interface{}) (string, error) {
 	val, ok := v.(string)
