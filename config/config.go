@@ -117,37 +117,23 @@ func getPass(s ...string) (string, error) {
 		in  *os.File
 		out io.Writer
 	)
-	switch len(s) {
-	case 0:
-		in = os.Stdin
-		out = os.Stdout
-	case 2:
-		if s[0] == "test" {
-			f, err := ioutil.TempFile("", "")
-			if err != nil {
-				return "", nil
-			}
-			defer func() {
-				f.Close()
-				os.Remove(f.Name())
-			}()
-			in = f
-			out = ioutil.Discard
-		}
-	default:
+	if len(s) != 0 && len(s) != 2 {
 		return "", fmt.Errorf("expected 0 or 2 args, got %d", len(s))
 	}
-	if _, err := fmt.Fprintf(out, "Password: "); err != nil {
-		return "", err
-	}
-	var password string
-	if in == os.Stdin {
-		pass, err := terminal.ReadPassword(int(in.Fd()))
+	if len(s) == 2 && s[0] == "test" {
+		f, err := ioutil.TempFile("", "")
 		if err != nil {
+			return "", nil
+		}
+		defer func() {
+			f.Close()
+			os.Remove(f.Name())
+		}()
+		in = f
+		out = ioutil.Discard
+		if _, err := fmt.Fprintf(out, "Password: "); err != nil {
 			return "", err
 		}
-		password = string(pass)
-	} else {
 		if _, err := io.WriteString(in, s[1]); err != nil {
 			return "", err
 		}
@@ -155,15 +141,24 @@ func getPass(s ...string) (string, error) {
 		if err != nil {
 			return "", nil
 		}
-		password = string(pass)
+		return string(pass), nil
+	}
+	in = os.Stdin
+	out = os.Stdout
+	if _, err := fmt.Fprintf(out, "Password: "); err != nil {
+		return "", err
+	}
+	pass, err := terminal.ReadPassword(int(in.Fd()))
+	if err != nil {
+		return "", fmt.Errorf("could not read password: %v", err)
 	}
 	if _, err := fmt.Fprintln(out); err != nil {
 		return "", err
 	}
-	return password, nil
+	return string(pass), nil
 }
 
-// prompt is a function fused cfg text templates to enter the specified value
+// prompt is a function used cfg text templates to enter the specified value
 // at an expected prompt on the remote session.
 func prompt(v interface{}) (string, error) {
 	val, ok := v.(string)
@@ -190,9 +185,12 @@ func (c *Config) String() string {
 }
 
 // MapCmds prints a map from options to commands.
-func MapCmds(cfg *Config) (map[string][]string, error) {
-	cmds := make(map[string][]string, len(cfg.Config))
-	for _, set := range cfg.Config {
+func (c *Config) Cmds() (map[string][]string, error) {
+	if c == nil {
+		return nil, errors.New("could not map commands: config is nil")
+	}
+	cmds := make(map[string][]string, len(c.Config))
+	for _, set := range c.Config {
 		switch v := set.Cmds.(type) {
 		case []interface{}:
 			for i := 0; i < len(v); i++ {
@@ -207,7 +205,7 @@ func MapCmds(cfg *Config) (map[string][]string, error) {
 				}
 			}
 		default:
-			return nil, fmt.Errorf("expected sequence or map, got %T", v)
+			return nil, fmt.Errorf("could not map commands: expected sequence or map, got %T", v)
 		}
 	}
 	return cmds, nil
