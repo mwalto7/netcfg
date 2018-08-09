@@ -6,57 +6,85 @@ import (
 )
 
 func TestClient_Addr(t *testing.T) {
+	var c *Client
+	if c.Addr() != "<nil>" {
+		t.Errorf("want <nil>, got %s", c.model)
+	}
 	addr := "127.0.0.1"
-	c := &Client{addr: addr}
+	c = &Client{addr: addr}
 	if c.addr != addr || c.Addr() != addr || c.Addr() != c.addr {
 		t.Errorf("want %s, got %s", addr, c.addr)
 	}
 }
 
 func TestClient_Hostname(t *testing.T) {
+	var c *Client
+	if c.Hostname() != "<nil>" {
+		t.Errorf("want <nil>, got %s", c.model)
+	}
 	hostname := "localhost"
-	c := &Client{hostname: hostname}
+	c = &Client{hostname: hostname}
 	if c.hostname != hostname || c.Hostname() != hostname || c.Hostname() != c.hostname {
 		t.Errorf("want %s, got %s", hostname, c.hostname)
 	}
 }
 
 func TestClient_Vendor(t *testing.T) {
+	var c *Client
+	if c.Vendor() != "<nil>" {
+		t.Errorf("want <nil>, got %s", c.model)
+	}
 	vendor := "cisco"
-	c := &Client{vendor: vendor}
+	c = &Client{vendor: vendor}
 	if c.vendor != vendor || c.Vendor() != vendor || c.Vendor() != c.vendor {
 		t.Errorf("want %s, got %s", vendor, c.vendor)
 	}
 }
 
 func TestClient_OS(t *testing.T) {
+	var c *Client
+	if c.OS() != "<nil>" {
+		t.Errorf("want <nil>, got %s", c.model)
+	}
 	os := "IOS"
-	c := &Client{os: os}
+	c = &Client{os: os}
 	if c.os != os || c.OS() != os || c.OS() != c.os {
 		t.Errorf("want %s, got %s", os, c.addr)
 	}
 }
 
 func TestClient_Model(t *testing.T) {
+	var c *Client
+	if c.Model() != "<nil>" {
+		t.Errorf("want <nil>, got %s", c.model)
+	}
 	model := "c2960"
-	c := &Client{model: model}
+	c = &Client{model: model}
 	if c.model != model || c.Model() != model || c.Model() != c.model {
 		t.Errorf("want %s, got %s", model, c.model)
 	}
 }
 
 func TestClient_Version(t *testing.T) {
+	var c *Client
+	if c.Version() != "<nil>" {
+		t.Errorf("want <nil>, got %s", c.model)
+	}
 	version := "15.0(2)SE10a"
-	c := &Client{version: version}
+	c = &Client{version: version}
 	if c.version != version || c.Version() != version || c.Version() != c.version {
 		t.Errorf("want %s, got %s", version, c.version)
 	}
 }
 
 func TestClient_String(t *testing.T) {
+	var c *Client
+	if c.String() != "<nil>" {
+		t.Errorf("want <nil>, got %s", c.model)
+	}
 	want := fmt.Sprintf("IP Addr: %s, Hostname: %s, Vendor: %s, OS: %s, Model: %s, Version: %s",
 		"127.0.0.1", "localhost", "cisco", "ios", "c2960s", "15.0(2)SE10a")
-	c := &Client{nil, "127.0.0.1", "localhost", "cisco", "ios", "c2960s", "15.0(2)SE10a"}
+	c = &Client{nil, "127.0.0.1", "localhost", "cisco", "ios", "c2960s", "15.0(2)SE10a"}
 	if c.String() != want {
 		t.Errorf("want %s, got %s", want, c.String())
 	}
