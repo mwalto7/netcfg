@@ -2,8 +2,6 @@ package device
 
 import (
 	"fmt"
-	"io"
-	"io/ioutil"
 	"net"
 	"regexp"
 	"strings"
@@ -13,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"golang.org/x/crypto/ssh"
+	"bytes"
 )
 
 // Timeout is the duration to wait for an SSH connection to establish.
@@ -52,104 +51,113 @@ func Dial(host, port string, clientCfg *ssh.ClientConfig) (*Client, error) {
 
 // Addr returns the remote host's IP address.
 func (c *Client) Addr() string {
+	if c == nil {
+		return "<nil>"
+	}
 	return c.addr
 }
 
 // Hostname returns the remote host's hostname.
 func (c *Client) Hostname() string {
+	if c == nil {
+		return "<nil>"
+	}
 	return c.hostname
 }
 
 // Vendor returns the remote host's vendor.
 func (c *Client) Vendor() string {
+	if c == nil {
+		return "<nil>"
+	}
 	return c.vendor
 }
 
 // OS returns the remote host's operating system.
 func (c *Client) OS() string {
+	if c == nil {
+		return "<nil>"
+	}
 	return c.os
 }
 
 // Model returns the remote host's model.
 func (c *Client) Model() string {
+	if c == nil {
+		return "<nil>"
+	}
 	return c.model
 }
 
 // Version returns the remote host's software version.
 func (c *Client) Version() string {
+	if c == nil {
+		return "<nil>"
+	}
 	return c.version
 }
 
 // Run creates a new SSH session, starts a remote shell, and runs the
 // specified commands on the remote host.
 func (c *Client) Run(cmds ...string) ([]byte, error) {
+	// create a new session
 	session, err := c.client.NewSession()
 	if err != nil {
 		return nil, err
 	}
 	defer session.Close()
 
-	stdin, stdout, stderr, err := pipeIO(session)
+	// create a pipe to the remote device's standard input
+	stdin, err := session.StdinPipe()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not create pipe to remote standard input: %v", err)
 	}
 	defer stdin.Close()
 
+	// copy the remote device's standard output to a buffer
+	var buf bytes.Buffer
+	session.Stdout = &buf
+
+	// start the remote shell
 	if err := session.Shell(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not start remote shell: %v", err)
 	}
+
+	// run the commands
 	for _, cmd := range cmds {
-		_, err := io.WriteString(stdin, fmt.Sprintf("%s\n", cmd))
-		if err != nil {
-			return nil, err
+		if _, err := stdin.Write([]byte(cmd + "\n")); err != nil {
+			return nil, fmt.Errorf("failed to run %q: %v", cmd, err)
 		}
 	}
-	wait := make(chan error, 1)
+
+	// wait for the remote commands to exit or time out
+	wait := make(chan error)
 	go func() {
 		wait <- session.Wait()
 	}()
 	select {
 	case err := <-wait:
 		if err != nil {
-			switch err.(type) {
+			switch v := err.(type) {
 			case *ssh.ExitError:
-				// TODO: handle exit errors
+				return nil, fmt.Errorf("session exited with status %d: %v", v.ExitStatus(), v)
 			case *ssh.ExitMissingError:
-				// TODO: handle missing exit errors
+				return nil, fmt.Errorf("session exited with no status: %v", v)
 			default:
-				return nil, err
+				return nil, fmt.Errorf("session failed to exit: %v", v)
 			}
 		}
-		b, err := ioutil.ReadAll(io.MultiReader(stdout, stderr))
-		if err != nil {
-			return nil, err
-		}
-		return b, nil
+		return buf.Bytes(), nil
 	case <-time.After(Timeout):
 		return nil, errors.New("session timed out")
 	}
 }
 
-// pipeIO creates pipes to the remote shell's standard input, standard
-// output, and standard error.
-func pipeIO(session *ssh.Session) (stdin io.WriteCloser, stdout, stderr io.Reader, err error) {
-	stdin, err = session.StdinPipe()
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	stdout, err = session.StdoutPipe()
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	stderr, err = session.StderrPipe()
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	return
-}
-
 // String is the string representation of a client.
 func (c *Client) String() string {
+	if c == nil {
+		return "<nil>"
+	}
 	return fmt.Sprintf("IP Addr: %s, Hostname: %s, Vendor: %s, OS: %s, Model: %s, Version: %s",
 		c.addr, c.hostname, c.vendor, c.os, c.model, c.version)
 }
