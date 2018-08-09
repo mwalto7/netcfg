@@ -189,19 +189,6 @@ Compiled Wed 0`,
 		},
 	},
 	{
-		name: "Cisco IOS XR",
-		descr: `Cisco IOS XR Software (Cisco ASR9K Series),  Version 5.3.4[Default]
-Copyright (c) 2016 by Cisco Systems, Inc.`,
-		want: map[string]string{
-			"addr":     "",
-			"hostname": "",
-			"vendor":   "CISCO",
-			"os":       "IOS XR",
-			"model":    "ASR9K",
-			"version":  "Version 5.3.4[Default]",
-		},
-	},
-	{
 		name: "HP Comware",
 		descr: `HPE Comware Platform Software, Software Version 7.1.070, Release 1309
 HPE 5130 48G PoE+ 4SFP+ 1-slot HI Switch JH326A
