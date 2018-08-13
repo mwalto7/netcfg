@@ -19,8 +19,7 @@ aliases:
     os: ios
     cmds: &cisco_cmds
       0: conf t
-      # placeholder for snmp location command
-      # key "1" will be inserted below
+      1: # placeholder for snmp location command; key "1" will be inserted below
       2: exit
       3: write mem
       4: exit

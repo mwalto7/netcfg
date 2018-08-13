@@ -253,7 +253,7 @@ var configParseTests = []configTest{
 					4: "quit",
 				}},
 			},
-			Config:  []cmdSet{
+			Config: []cmdSet{
 				{Vendor: "cisco", OS: "ios", Hostname: "switch-1", Cmds: map[interface{}]interface{}{
 					0: "conf t",
 					1: "snmp-server location snmp-location-switch-1",

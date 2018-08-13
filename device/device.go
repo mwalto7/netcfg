@@ -1,6 +1,7 @@
 package device
 
 import (
+	"bytes"
 	"fmt"
 	"net"
 	"regexp"
@@ -11,7 +12,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"golang.org/x/crypto/ssh"
-	"bytes"
 )
 
 // Timeout is the duration to wait for an SSH connection to establish.
